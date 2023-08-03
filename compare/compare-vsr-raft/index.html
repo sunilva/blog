@@ -1,0 +1,618 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.1.21">
+    
+    
+      
+        <title>Comparing VSR And Raft Algorithms - Slow Host</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.eebd395e.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ecc896b0.min.css">
+      
+      
+
+    
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#introduction" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Slow Host" class="md-header__button md-logo" aria-label="Slow Host" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Slow Host
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Comparing VSR And Raft Algorithms
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+          
+            
+            
+            
+            <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+            
+              <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9v1Z"/></svg>
+              </label>
+            
+          
+            
+            
+            
+            <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+            
+              <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7M9 21v-1h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1m3-17a5 5 0 0 0-5 5c0 2.05 1.23 3.81 3 4.58V16h4v-2.42c1.77-.77 3-2.53 3-4.58a5 5 0 0 0-5-5Z"/></svg>
+              </label>
+            
+          
+        </form>
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../.." class="md-tabs__link">
+      Home
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../../reading/" class="md-tabs__link">
+      Reading List
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../../bookmarks/" class="md-tabs__link">
+      Bookmarks
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../../about/" class="md-tabs__link">
+      About
+    </a>
+  </li>
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+                
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" hidden>
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Slow Host" class="md-nav__button md-logo" aria-label="Slow Host" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    Slow Host
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        Home
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reading/" class="md-nav__link">
+        Reading List
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../bookmarks/" class="md-nav__link">
+        Bookmarks
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/" class="md-nav__link">
+        About
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+                
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    Introduction
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#replication" class="md-nav__link">
+    Replication
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#leader-election" class="md-nav__link">
+    Leader election
+  </a>
+  
+    <nav class="md-nav" aria-label="Leader election">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#raft" class="md-nav__link">
+    Raft
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vsr" class="md-nav__link">
+    VSR
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commit" class="md-nav__link">
+    Commit
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recovery" class="md-nav__link">
+    Recovery
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reconfiguration" class="md-nav__link">
+    Reconfiguration
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conclusion" class="md-nav__link">
+    Conclusion
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  <h1>Comparing VSR And Raft Algorithms</h1>
+
+<h3 id="introduction">Introduction<a class="headerlink" href="#introduction" title="Permanent link">&para;</a></h3>
+<p>View Stamp Replication(VSR) &amp; Raft are replication algorithms for implementing fault replicated state machines(basis for building other
+distributed applications like storage, database etc). </p>
+<p>VSR was first published in <todo> independent of Paxos, however for this discussion we will be considering VSR revisited.  </p>
+<p>Both assume asynchronous model in which no assumptions are made w.r.t time, crash failure &amp; network in which messages can be 
+delivered out-of-order, lost, duplicated &amp; delayed for arbitrary time but delivery is guaranteed if retried indefinitely i.e network is reliable. 
+VSR doesn't need disk &amp; assumes failure independence of the hosts.</p>
+<p>Raft's design is aimed as Understandability.</p>
+<table>
+<thead>
+<tr>
+<th>VSR</th>
+<th>Raft</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Primary</td>
+<td>Leader</td>
+</tr>
+<tr>
+<td>Backup</td>
+<td>Follower</td>
+</tr>
+<tr>
+<td>View</td>
+<td>Term</td>
+</tr>
+<tr>
+<td>Epoch</td>
+<td>-NA-</td>
+</tr>
+<tr>
+<td>Replication</td>
+<td>Normal</td>
+</tr>
+<tr>
+<td>Election</td>
+<td>View Change</td>
+</tr>
+</tbody>
+</table>
+<h3 id="replication">Replication<a class="headerlink" href="#replication" title="Permanent link">&para;</a></h3>
+<p>One of the hosts in the system is elected a leader which receives requests from clients &amp; replicates the 
+requests to other hosts called followers.</p>
+<hr />
+<p>Raft sends two entries viz. current &amp; previous while replicating entries to follower, foll
+Raft sends empty append entry requests as heart beats to follower.</p>
+<hr />
+<p>VSR sends a single entry to the backup replicas, if backup identifies it is missing entries 
+the it does a GET-STATE operation to fetch missing entries</p>
+<h3 id="leader-election">Leader election<a class="headerlink" href="#leader-election" title="Permanent link">&para;</a></h3>
+<h4 id="raft">Raft<a class="headerlink" href="#raft" title="Permanent link">&para;</a></h4>
+<p>Raft uses voting mechanism to elect a new leader. A follower increments it's term, becomes a candidate 
+and requests a votes from the followers. If any candidate receives a quorum of votes then it transitions to it's 
+state to become leader for the new term. </p>
+<p><todo> State diagram for leader election is shown below: 
+<todo> timeline view</p>
+<p>Safety: 
+    A quorum of votes are required to be a leader for a given term. </p>
+<div class="language-text highlight"><pre><span></span><code>Replication requests carry the current term, if follower&#39;s term doesn&#39;t match the leader the request is rejected 
+by the follower.  If election fails due to split votes then election is started for next term abandoning the 
+term for which election was in progress.
+</code></pre></div>
+<p>Liveness:
+    Election can if votes get's split across more than one candidate &amp; nobody receives a majority of the votes(quorum). </p>
+<div class="language-text highlight"><pre><span></span><code>Raft uses randomization technique so as to avoid multiple followers initiating election at about the same time
+resulting in split votes.
+</code></pre></div>
+<h4 id="vsr">VSR<a class="headerlink" href="#vsr" title="Permanent link">&para;</a></h4>
+<p>VSR uses a three phase protocol to elect a new primary, the safety condition being: "No committed entry should be lost" </p>
+<ul>
+<li>Phase-1(SVC): 
+    A quorum of replicas agree to stop participating in replication process no new entries get added to logs &amp; commit
+    doesn't happen. </li>
+<li>Phase-2(DVC): 
+    The new primary gets logs from a quorum of replicas, the new primary determines log to be used for initializing 
+    the next view.</li>
+<li>Phase-3(SV):<br />
+    The new primary initializes all the replicas with log determined in phase-2 &amp; starts replication process for the 
+    next view.    </li>
+</ul>
+<p>StartViewChange(SVC): 
+    Upon timeout expiry one or more backups increment the view &amp; start SVC broadcast messaging. 
+    If a replica receives a quorum of SVC messages then it sends DVC message to the next primary.
+DoViewChange(DVC): </p>
+<p>StartView(SV): 
+    Start view message initializes the log of the backups at the start of the next view 
+    with log &amp; commit number determined during the DVC phase.</p>
+<p>Safety: 
+    Leader election is safe as quorum of hosts need to agree on the next view. 
+    As quorum of replicas agree on the next view, requests from previous primary(if it hadn't crashed but merely 
+    slowed down temporarily) will be ignored at least one replica which has moved to next view. 
+    Hence previous primary will not be able to commit any request as it can't replicate to a quorum of replicas.</p>
+<p>Liveness: 
+    If the chosen host is down then term gets incremented &amp; another round of SVC messaging is triggered to choose 
+    another host as a new leader. SVC messaging should continue indefinitely until a quorum of replicas are contacted.</p>
+<div class="language-text highlight"><pre><span></span><code>As hosts co-ordinate rather than compete to elect next leader FLP has minimal impact on VSR as compared to Raft. 
+The chosen host has to be done if leader election has to fail.
+</code></pre></div>
+<h3 id="commit">Commit<a class="headerlink" href="#commit" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Leader doesn't overwrite</li>
+</ul>
+<h3 id="recovery">Recovery<a class="headerlink" href="#recovery" title="Permanent link">&para;</a></h3>
+<p>Raft persists every request as it gets replicated hence the mechanism required in recovering a failed follower is minimal. 
+Further Leader assists the follower to recover. </p>
+<p>VSR doesn't use disk. In practical implementations VSR persists client request to the disk in the background. 
+VSR restores it's state from other hosts in the system. For safety reason it contacts a quorum of hosts which 
+needs to consist leader as well, to fetch the latest state.</p>
+<h3 id="reconfiguration">Reconfiguration<a class="headerlink" href="#reconfiguration" title="Permanent link">&para;</a></h3>
+<h3 id="conclusion">Conclusion<a class="headerlink" href="#conclusion" title="Permanent link">&para;</a></h3>
+<p>VSR relies only a single axiomatic rule that commit of entry is safe if it is replicated on quorum of replicas.
+Raft follows the philosophy follow the leader, intelligence is concentrated on leader.</p>
+<p>State space reduction should be aim of algorithm design 
+Reducing the amount of mechanism involved in the algorithm is helpful for practical implementation.</p>
+<hr />
+<p>Replication:</p>
+<p>Leader election:</p>
+<p>Recovery: </p>
+<p>Reconfiguration: 
+    Raft reconfiguration is very simple</p>
+<hr />
+<p>While VSR uses simple axiomatic rules for commit guarantee, Raft doesn't 
+Raft seems like an engineering solution coming out of industry while VSR presentation is more academic in nature.</p>
+
+
+
+  
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+            Back to top
+          </button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "toc.follow", "content.action.edit", "navigation.top"], "search": "../../assets/javascripts/workers/search.74e28a9f.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.220ee61c.min.js"></script>
+      
+    
+  </body>
+</html>

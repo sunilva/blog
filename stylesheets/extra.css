@@ -1,0 +1,14 @@
+.md-grid {
+    max-width: 1150px;    
+  }
+  
+.md-sidebar--secondary {
+    order: 0;
+    text-align: left;
+    text-justify: left;    
+}  
+.md-main {
+    text-align: justify;
+    text-justify: inter-word;
+}
+

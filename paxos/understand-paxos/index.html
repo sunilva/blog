@@ -1,0 +1,938 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.2, mkdocs-material-9.1.21">
+    
+    
+      
+        <title>Understanding Paxos With Three Simple Rules - Slow Host</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.eebd395e.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ecc896b0.min.css">
+      
+      
+
+    
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#problem-statement-definitions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Slow Host" class="md-header__button md-logo" aria-label="Slow Host" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Slow Host
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Understanding Paxos With Three Simple Rules
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+          
+            
+            
+            
+            <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+            
+              <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9v1Z"/></svg>
+              </label>
+            
+          
+            
+            
+            
+            <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+            
+              <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7M9 21v-1h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1m3-17a5 5 0 0 0-5 5c0 2.05 1.23 3.81 3 4.58V16h4v-2.42c1.77-.77 3-2.53 3-4.58a5 5 0 0 0-5-5Z"/></svg>
+              </label>
+            
+          
+        </form>
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../.." class="md-tabs__link">
+      Home
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../../reading/" class="md-tabs__link">
+      Reading List
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../../bookmarks/" class="md-tabs__link">
+      Bookmarks
+    </a>
+  </li>
+
+      
+        
+  
+  
+
+
+  <li class="md-tabs__item">
+    <a href="../../about/" class="md-tabs__link">
+      About
+    </a>
+  </li>
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+                
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" hidden>
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Slow Host" class="md-nav__button md-logo" aria-label="Slow Host" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    Slow Host
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        Home
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reading/" class="md-nav__link">
+        Reading List
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../bookmarks/" class="md-nav__link">
+        Bookmarks
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/" class="md-nav__link">
+        About
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+                
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem-statement-definitions" class="md-nav__link">
+    Problem statement &amp; definitions
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-three-rules" class="md-nav__link">
+    The Three Rules
+  </a>
+  
+    <nav class="md-nav" aria-label="The Three Rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rule-one-multiple-rounds" class="md-nav__link">
+    Rule One: Multiple Rounds
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rule-two-kill-the-past" class="md-nav__link">
+    Rule Two: Kill The Past
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rule-three-past-is-prologue" class="md-nav__link">
+    Rule Three: Past Is Prologue
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#paxos-algorithm" class="md-nav__link">
+    Paxos Algorithm
+  </a>
+  
+    <nav class="md-nav" aria-label="Paxos Algorithm">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-phase-protocol" class="md-nav__link">
+    Two phase protocol
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safety-liveness" class="md-nav__link">
+    Safety &amp; Liveness
+  </a>
+  
+    <nav class="md-nav" aria-label="Safety & Liveness">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#safety" class="md-nav__link">
+    Safety
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#liveness" class="md-nav__link">
+    Liveness
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-paxos" class="md-nav__link">
+    Multi-Paxos
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-next" class="md-nav__link">
+    What's Next
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  <h1>Understanding Paxos With Three Simple Rules</h1>
+
+<h3 id="problem-statement-definitions">Problem statement &amp; definitions<a class="headerlink" href="#problem-statement-definitions" title="Permanent link">&para;</a></h3>
+<p>The problem of consensus is defined as a group of processes agreeing on a single value.</p>
+<p>Formally, consensus needs to address the following three conditions:</p>
+<ul>
+<li>Agreement: All correct processes decide on the same value. </li>
+<li>Validity: The value agreed upon is actually proposed(<em>this is to avoid trivial solutions, all processes can simply decide a fixed value no matter what, say, 42</em>).  </li>
+<li>Termination: Eventually all correct processes reach a decision. </li>
+</ul>
+<p>The first two are safety properties &amp; last one is liveness property.</p>
+<p><strong>Acceptors &amp; proposers:</strong>
+The processes(<em>or hosts</em>) are divided into a set of acceptors &amp; proposers(<em>ignoring learners</em>).
+Proposers propose to acceptors in order to choose a value. It is possible for a single process to be an acceptor &amp; proposer 
+but for simplicity we will consider acceptors &amp; proposers to be distinct. </p>
+<p><strong>Asynchronous system</strong>: The processes are connected by a network &amp; communicate with each other by exchanging messages.</p>
+<ul>
+<li>
+<p><em>Processes:</em> Processes can crash &amp; restart, processes are equipped with stable storage. Processes can take arbitrary time to execute &amp; respond back to a message. 
+  The set of acceptor processes is fixed &amp; known a priori. A process uses stable storage to remember critical information when it restarts after crashing.  </p>
+</li>
+<li>
+<p><em>Network</em>: Messages can get arbitrarily delayed in the network. Messages can get duplicated, be delivered out-of-order &amp; get lost. However the network 
+  is considered to be reliable in the sense that if the sending process retries indefinitely then message will be delivered, eventually. </p>
+</li>
+<li>
+<p><em>Communication(timing)</em>: Since processes &amp; network don't provide any guarantee w.r.t time no timing assumptions are made. 
+  Processes can't use clock to accurately measure time interval or determine an epoch. </p>
+</li>
+</ul>
+<div class="admonition warning">
+<p><em>A fundamental problem in an asynchronous distributed system is that it is impossible to tell <strong><em>whether a process has crashed or slowed down</em></strong>.</em>
+<br><em>Hence, it becomes imperative to <strong><em>neutralize a slow process's execution</em></strong> in order to proceed further so as to avoid adverse effects(ensure "safety").</em></p>
+<details class="question">
+<summary>Why can't failure be detected using a ping</summary>
+<p>The expected time to receive a reply for a ping can't be bounded as, by definition, a process can take arbitrary time to reply back &amp; 
+the time delay in network is unbounded.  </p>
+</details>
+</div>
+<p><strong>Quorum:</strong> Any sub set containing at least a majority of elements of a set is called a quorum. Given a set, any two quorums contain at least one element in common. 
+<br>This key property is leveraged in ensuring safety property: <strong><em>single value is chosen, always</em></strong>. 
+<br>We will assume the system contains <strong><em>2N + 1</em></strong> acceptors, at least <strong><em>N+1</em></strong> acceptors are required to form a quorum.</p>
+<p><strong>Choosing a value</strong>: If a value is chosen by a quorum of processes, then chosen value can be learnt by querying a quorum of processes. 
+Hence a group of <strong><em>2N + 1</em></strong> acceptors can sustain up to <strong><em>N</em></strong> acceptor failures. Thus the processes provide fault tolerance.   </p>
+<div class="admonition success">
+<p class="admonition-title">Choosing a value</p>
+<p><em>A value is considered to be chosen if it is <strong>accepted by a quorum of processes</strong>.</em>
+<br><em>At <u>no point in time</u>, two different proposers should have different values accepted by a quorum of acceptors.</em></p>
+</div>
+<h3 id="the-three-rules">The Three Rules<a class="headerlink" href="#the-three-rules" title="Permanent link">&para;</a></h3>
+<h4 id="rule-one-multiple-rounds"><u>Rule One: Multiple Rounds</u><a class="headerlink" href="#rule-one-multiple-rounds" title="Permanent link">&para;</a></h4>
+<p>Suppose acceptors are allowed to accept only once &amp; there are two concurrent proposals i.e one for value <strong><em>a</em></strong> by proposer <strong>P1</strong> 
+&amp; another for value <strong><em>b</em></strong> by proposer <strong>P2</strong>. Now, assume <strong><em>N</em></strong> acceptors accept value <strong><em>a</em></strong> , another <strong><em>N</em></strong> acceptors accept value <strong><em>b</em></strong> 
+&amp; the remaining one has failed. Under this scenario there is no further progress possible unless more proposal attempts are made.</p>
+<div class="language-text highlight"><span class="filename">Why can't we have a single proposer, always ?</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>That single proposer can die or can become slow. 
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>If a proposer becomes slow then another proposer steps in, at this point the slow proposer 
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>can come back again. Thus we have two concurrent proposals.
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>Remember we can&#39;t distinguish between slow &amp; crashed processes.
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>Note that there can be more than two concurrent proposals.
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Rule One: Multiple Rounds</p>
+<p><strong><em><center><span style="color:blue">Due to concurrent proposers, more than one proposal may be needed for choosing a value. 
+<br><u>Safety:</u> Even with concurrent proposals a single value should be chosen, always.</span></em></strong></p>
+</div>
+<p><strong><em>Note:</em></strong> Since multiple proposals are required, each proposal is numbered &amp; the proposals are assumed to be totally ordered(<em>monotonically increasing</em>). 
+A proposal is now expressed as: <mark><em>&lt; proposal-number, value &gt;</em></mark>. In each proposal first a query is made to know the current status &amp; then a value is
+proposed for consensus.  </p>
+<h4 id="rule-two-kill-the-past"><u>Rule Two: Kill The Past</u><a class="headerlink" href="#rule-two-kill-the-past" title="Permanent link">&para;</a></h4>
+<p><todo query & set> <todo search host reference>
+Consider the situation in the below diagram:
+<div class="language-text highlight"><span class="filename">An acceptor common between two proposals hasn't accepted any value</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>    |&lt;---P1---&gt;|            * Proposals P1 &amp; P2 have an acceptor &quot;A&quot; in common, P2 &gt; P1.
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    +------+---+------+     * &quot;A&quot; hasn&#39;t accepted a value from P1, A.value = nil.  
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    |  N1  | A |  N2  |     * N1 &amp; N2 don&#39;t have anything in common.
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    +------+---+------+
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>           |&lt;---P2---&gt;|    
+</span></code></pre></div></p>
+<ol>
+<li>Acceptor <strong>"A"</strong> which is common between proposals <strong>P1</strong> &amp; <strong>P2</strong> hasn't accepted any value.</li>
+<li>It is not possible for proposal <strong>P2</strong> to know what value acceptors in <strong>"N1"</strong> have accepted(or will accept in future).</li>
+<li><strong>P2</strong> can choose to propose any value, however it should ensure that a different value is not chosen by <strong>P1</strong>.</li>
+<li>To deal with above situation, before proposing a value in proposal <strong>P2</strong>, proposer 
+   for <strong>P2</strong> extracts a promise from acceptor <strong>"A"</strong> not to accept any proposal lesser than itself.</li>
+<li>Hence proposal <strong>P1</strong> will not be able to achieve acceptance from a quorum i.e <strong>P2</strong> just killed <strong>P1</strong>.</li>
+<li>There could be more than one proposal before <strong>P2</strong>, all those proposals in which <em><u>at least one common acceptor</u></em> hasn't yet accepted a value
+   will be killed by <strong>P2</strong>.</li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Rule Two: Kill The Past</p>
+<p><strong><em><center><span style="color:blue;">Extract a promise from acceptors participating in the current proposal not to accept any proposal lesser than 
+        the current one.</em></strong></span></p>
+</div>
+<h4 id="rule-three-past-is-prologue"><u>Rule Three: Past Is Prologue</u><a class="headerlink" href="#rule-three-past-is-prologue" title="Permanent link">&para;</a></h4>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Single Accepted Value From Past Proposal</label><label for="__tabbed_1_2">Multiple Accepted Values From Different Past Proposals</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p><center><strong>Note: Make sure you read next tab after reading this one.</strong></center>
+  <div class="language-text highlight"><span class="filename">Acceptor A which is common between proposals P1 & P2 has accepted a value.</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>|&lt;---P1---&gt;|            * Proposals P1 &amp; P2 have an acceptor &quot;A&quot; in common, P2 &gt; P1.
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>+------+---+------+     * &quot;A&quot; has already accepted a value from P1, A.value = P1.value.
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>|  N1  | A |  N2  |     * N1 &amp; N2 don&#39;t have anything in common.
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>+------+---+------+
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>       |&lt;---P2---&gt;|
+</span></code></pre></div></p>
+<ol>
+<li>Acceptor <strong>"A"</strong> had already accepted <strong>"a"</strong> as a value from <strong>P1</strong> before <strong>P2</strong> started.</li>
+<li>If a different value, say <strong>"b"</strong>, were to be chosen in proposal <strong>P2</strong>. <ul>
+<li>Acceptors in <strong>"N1"</strong> can complete the proposal <strong>P1</strong> which chooses <strong>"a"</strong>. 
+     Note that proposal <strong>P2</strong> doesn't has any control over the acceptors in <strong>"N1"</strong>.
+     It's also possible <strong>P1</strong> has already reached consensus.</li>
+<li>Proposer for <strong>P1</strong> would deem <strong>"a"</strong> as chosen value &amp; proposer for <strong>P2</strong> would deem <strong>"b"</strong> as chosen value.</li>
+<li>Ultimately, though a quorum has accepted <strong>"b"</strong> after <strong>P2</strong> completes, there would have been a <u>flip from <strong>"a"</strong> to <strong>"b"</strong></u> 
+     at some point in time if proposal <strong>P1</strong> completes before <strong>P2</strong>. </li>
+</ul>
+</li>
+<li>To avoid above situation, before proposing a value in proposal <strong>P2</strong>, the proposer tries to learn if any of the acceptors in <strong>P2</strong> had already 
+     accepted a value from past proposal. If so, then the previously accepted value is chosen for the current proposal <strong>P2</strong>.</li>
+<li>We are still not done, what if more than one acceptor has accepted different value from different past proposals. 
+     A question that arises is <strong>which value</strong> should be considered for the current proposal? Continue to the next tab for answer.</li>
+</ol>
+<hr />
+</div>
+<div class="tabbed-block">
+<p><center><strong>Note: Make sure you have read previous tab.</strong></center>
+  Whenever a new proposal starts it will able to know about all the past proposals by querying a quorum of acceptor. As per quorum
+  property the current proposal will have one or more common acceptors in each of past proposals. The past proposals
+  will fall into two categories, given a past proposal &amp; current proposal: </p>
+<ul>
+<li>At least one common acceptor hasn't accepted a value, such proposals will be killed following <strong>Rule-2</strong>.      </li>
+<li>
+<p>One or more common acceptors has accepted a value, such proposals will be in one of these states: <strong><em>dead, ongoing or consensus achieved</em></strong>. 
+    However the current proposal can't know about the status of the past proposals all by itself(<em>It needs to be deduced through other past proposals</em>). 
+    Current proposal has to choose one value from the different values proposed in these past proposals preserving <strong><em>safety</em></strong>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Safety requires that no two ongoing proposals choose different values.</p>
+</div>
+</li>
+</ul>
+<p>Consider the following sequence of possibilities, beginning with two proposals <strong>P1</strong> &amp; <strong>P2</strong> 
+  which have accepted values <strong>aa</strong>(both are ongoing i.e <strong><em>previous tab</em></strong>) or <strong>ab</strong>(P2 has killed P1 i.e <strong>rule-2</strong>), respectively. 
+  Subsequently value to be proposed by <strong>P3</strong> is deduced from past proposals <strong>P1 &amp; P2</strong> ensuring safety. 
+  In the process, in order to generalize, we arrive at the pattern of dead &amp; ongoing proposals 
+  which will be used for choosing a value to be proposed by any future proposal after <strong>P3</strong>.  </p>
+<p><center><p><img src="/blog/paxos/paxos.png" alt="Multiple Accepted Values" width="800px"/></p></center></p>
+<p><u><strong>Choosing value for P3:</strong></u></p>
+<ul>
+<li>
+<p><u>Cases 7,3:</u> Both of these have two acceptors in current proposal which have accepted a value from different past proposals.</p>
+<ul>
+<li><u>case-7:</u> value corresponding to the higher numbered proposal i.e <strong>"b"</strong> should be used considering <strong>safety</strong>. Otherwise
+                   two ongoing proposals will be proposing values <strong>"a"</strong> &amp; <strong>"b"</strong>. </li>
+<li><u>case-3:</u> either of them can be used, since we used higher numbered proposal w.r.t <em>case-7</em> same can be done in this case.</li>
+</ul>
+</li>
+<li>
+<p><u>Cases 4,8:</u>
+        Acceptors in current proposal didn't accept a value in any of the past proposals.
+        All past proposals get killed, current proposal is free to choose any value of it's choice. </p>
+</li>
+<li>
+<p><u>Rest of the cases:</u> A single acceptor in current proposal accepted a value in a past proposal, choice is obvious.</p>
+</li>
+</ul>
+<p>From here onwards, <u>highest-numbered proposal</u> refers to the largest-numbered past proposal from which an acceptor participating 
+  in the current proposal had accepted a value in the past. And by <u>accepted values</u> we mean values accepted by acceptors common between 
+  a past proposal &amp; current proposal. </p>
+<p><u><strong>Choosing value for future proposals:</strong></u></p>
+<ul>
+<li>
+<p><u>cases 2 to 8:</u>The pattern observed is ongoing proposals follow dead proposals, e.g: <mark><strong>dddooo</strong></mark>. 
+  All the ongoing proposals will be choosing same value. 
+  If two accepted values are considered then the pattern will be one of these: <mark><strong>dd</strong></mark>, <mark><strong>do</strong></mark>, <mark><strong>oo</strong></mark>.<br>
+  In this case as well highest numbered proposal needs to be considered for future proposal greater than <strong>P3</strong>.
+  The same reasoning can be extended if there are more than two accepted values.</p>
+</li>
+<li>
+<p><u>case-1:</u> The dead proposal had same value as the ongoing proposals. If we consider
+  first two as accepted values the pattern is <mark><strong>od</strong></mark>, in this case as well higher numbered proposal can be used so that it <strong>resolves
+  uniformly</strong> with all the other cases. In general, suppose the pattern is <mark><strong>ooooo</strong></mark> &amp; any proposal barring the first one gets killed, then above pattern results.</p>
+</li>
+</ul>
+<p><u><strong>Choosing value after consensus is achieved:</strong></u> 
+  <br>Once consensus is achieved, one or more concurrent future proposals will choose consensus proposal 
+  for highest-numbered proposal(<em>since a quorum of acceptors would have accepted a value</em>). For all future proposals, either 
+  consensus proposal or one of those following it will be chosen for highest-numbered proposal. 
+  <em>Cases 4,8</em> are not possible. Also, notice that up to <strong>N</strong> failures can be sustained.</p>
+<div class="admonition note">
+<p>In all the cases, value corresponding to the <strong><em>highest-numbered proposal</em></strong> should be used for current proposal.</p>
+</div>
+<details class="note">
+<summary>Paxos Recursion</summary>
+<p>If you remember, earlier it was said current proposal can't know the status(<em>dead,ongoing or consensus</em>) of past proposals all by itself. 
+By choosing value corresponding to the highest-numbered proposal it implicitly gets to know about the status of past proposals(<em>what's shown in
+the table above is base case</em>). </p>
+<p>The recursive nature of Paxos is depicted below. While the value corresponding to the highest-numbered proposal gets chosen for current proposal, 
+those shown in grey boxes(<em>no common acceptor had accepted a value for proposals between highest-numbered proposal &amp; current proposal</em>) will get 
+killed by the current proposal. The highest-numbered proposal would have done the same earlier(i.e deduce status), ensuring safety(<em>refer above table</em>). </p>
+<div class="admonition note">
+<pre class="mermaid"><code>    graph LR
+
+    A[dead]---B[highest]---C([dead])---D([ongoing])---E[highest]---F([ongoing])---G([ongoing])---H([dead])---I([ongoing])---J[current]
+
+    J--&gt;E--&gt;B
+
+    style F fill:#818589
+    style G fill:#818589
+    style H fill:#818589
+    style I fill:#818589</code></pre>
+</div>
+</details>
+<hr />
+</div>
+</div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Rule Three: Past Is Prologue</p>
+<p><strong><em><center><span style="color:blue;">If more than one acceptor participating in the current proposal had already accepted a value from different past proposals 
+then use the value corresponding to the highest-numbered past proposal for the current proposal to ensure safety</span>.</em></strong></p>
+</div>
+<h3 id="paxos-algorithm">Paxos Algorithm<a class="headerlink" href="#paxos-algorithm" title="Permanent link">&para;</a></h3>
+<h4 id="two-phase-protocol"><strong><u>Two phase protocol</u></strong><a class="headerlink" href="#two-phase-protocol" title="Permanent link">&para;</a></h4>
+<p>To satisfy <strong><em>Rule-2 &amp; Rule-3</em></strong> Paxos runs in two phases viz. <strong><em>prepare &amp; accept</em></strong>. 
+Rules are applied during the <strong>prepare</strong> phase which is followed by <strong>accept</strong> phase to propose a value.      </p>
+<details class="info">
+<summary>Paxos Protocol</summary>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Phase 1. (a) A proposer selects a proposal number n and sends a prepare
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>         request with number n to a majority of acceptors.
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>         (b) If an acceptor receives a prepare request with number n greater
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>         than that of any prepare request to which it has already responded,
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>         then it responds to the request with a promise not to accept any more
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>         proposals numbered less than n and with the highest-numbered proposal
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>         (if any) that it has accepted.  
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>Phase 2. (a) If the proposer receives a response to its prepare requests
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>         (numbered n) from a majority of acceptors, then it sends an accept
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>         request to each of those acceptors for a proposal numbered n with a
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>         value v, where v is the value of the highest-numbered proposal among
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>         the responses, or is any value if the responses reported no proposals.
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>         (b) If an acceptor receives an accept request for a proposal numbered
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>         n, it accepts the proposal unless it has already responded to a prepare
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>         request having a number greater than n.
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The quorum in the accept phase need not necessarily be the same as the one during prepare phase.</p>
+<p>Since safety is guaranteed by rule-2 &amp; rule-3 during prepare phase, it doesn't matter which 
+acceptors are part of the quorum during accept phase. However, checkout this 
+<a href="https://brooker.co.za/blog/2021/11/16/paxos.html">potential bug</a>.</p>
+</div>
+</details>
+<h4 id="safety-liveness"><strong>Safety &amp; Liveness</strong><a class="headerlink" href="#safety-liveness" title="Permanent link">&para;</a></h4>
+<h5 id="safety">Safety<a class="headerlink" href="#safety" title="Permanent link">&para;</a></h5>
+<p><u><strong><em>Concurrency:</em></strong></u>
+Paxos uses a quorum whenever a new proposal starts which allows it to know about all past proposals.
+Given a current proposal there are only two possibilities w.r.t past proposals. </p>
+<ul>
+<li>at least one acceptor in the current proposal hasn't accepted any value in past proposals or </li>
+<li>one or more acceptors in the current proposal have already accepted a value prior to current proposal 
+  which can potentially complete along with current proposal. </li>
+</ul>
+<p>Accordingly, <strong><em>Rule-2 and Rule-3</em></strong> are applied to kill and choose a value for next proposal ensuring safety until a value gets chosen. 
+Once a value is chosen only <strong><em>Rule-3</em></strong> gets applied which ensures consensus value is used for all future proposals.</p>
+<p><strong><em><u>Failure:</u></em></strong>
+Paxos is resilient to proposer failures as it is safe for concurrent proposals.
+Acceptor failures are sustained due to quorum technique. </p>
+<p><u><strong><em>Totally ordered, unique proposal numbers:</em></strong></u>
+Paxos requires proposal numbers to be total ordered &amp; unique. </p>
+<p>This can be ensured if all proposers choose the proposal numbers from disjoint sets which are monotonically increasing. 
+For instance, this can be done by having the proposal number to be concatenation of a monotonically 
+increasing integer number &amp; acceptor number(acceptors are numbered 1 through n). </p>
+<p>The first part of the proposal number can be constructed by contacting a quorum of acceptors to know about highest numbered proposal 
+&amp; incrementing the first part of the proposal for next proposal.</p>
+<p><u><strong><em>Out-of-order message delivery:</em></strong></u>
+Since accept phase is started after prepare phase completes out-of-order message delivery is safe.
+If quorum used in prepare &amp; accept differ then some of the hosts will receive accept message without receiving any prepare request.
+In such a case acceptors should <a href="https://brooker.co.za/blog/2021/11/16/paxos.html">update the proposal number</a> as well(<em>which is done in prepare phase</em>).</p>
+<p><u><strong><em>stable storage:</em></strong></u> Paxos requires acceptors to remember the accepted value if an acceptor crashes &amp; restarts. An acceptor 
+stores the accepted value on stable storage before replying back to the proposers.  </p>
+<h5 id="liveness">Liveness<a class="headerlink" href="#liveness" title="Permanent link">&para;</a></h5>
+<p>Note that initially we stated that eventually a value should be decided by all correct processes. 
+Under certain condition this is not possible, this is not a serious limitation though &amp; can be circumvented for practical purposes.</p>
+<p><strong>Rule-2</strong> causes liveness issue, lets say an ongoing proposal is killed &amp; new one starts. But then the current proposal can get killed by a future proposal 
+&amp; the process can continue endlessly. Hence a value never gets chosen. The scenario is illustrated in the diagram below.
+There are two proposers &amp; for simplicity a single acceptor(common between the quorums) is being shown. It keeps on rejecting 
+the proposals as it keeps getting higher numbered prepare requests before an accept request.</p>
+<div class="language-text highlight"><span class="filename">Paxos liveness issue due to livelock</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>P1 ---&lt;1&gt;---------[1,a]----&lt;3&gt;---------------[3,a]----      &lt;n&gt;: proposal request
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>        \           \       \                  \            [&lt;proposal-no&gt;, &lt;value&gt;]: accept request  
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>         \           \       \                  \           x: rejected
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>A1 ------&lt;1&gt;---&lt;2&gt;----x------&lt;3&gt;----x----&lt;4&gt;-----x---
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>               /                   /      / 
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>              /                   /      / 
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>P2 ---------&lt;2&gt;----------------[2,b]----&lt;4&gt;----------
+</span></code></pre></div>
+<p>Note that while arriving at <strong><em>Rule-1</em></strong> the necessity for multiple proposers was introduced in the context of faulty proposer(crashed or slow). 
+Paxos simply assumes multiple proposers &amp; hence the above issue. The solution it suggests is to have a single distinguished proposer called leader.
+The liveness issue doesn't vanish but it is cleverly diverted to leader election(where it prevails). 
+If the leader is given sufficient time to complete both the phases &amp; the system(proposer, acceptor &amp; network) is working properly 
+then consensus is achieved.</p>
+<details>
+<summary>FLP in the context of Paxos</summary>
+<p>Liveness issue discussed above is attributed to the famous FLP proof which asserts that consensus is <strong>impossible even with a single faulty 
+process</strong> in an asynchronous system. What FLP really means is that consensus is not possible <strong>sometimes</strong> under certain conditions. 
+Consider the below statements taken from the FLP paper.</p>
+<div class="admonition warning">
+<p><strong>“window of vulnerability”</strong> - an interval of time during the execution of the algorithm in which the delay or inaccessibility 
+of a single process can cause the entire algorithm to wait indefinitely.</p>
+</div>
+<div class="admonition warning">
+<p>the stopping of a single process at an <strong>inopportune time</strong> can cause any distributed commit protocol to fail to reach agreement. </p>
+</div>
+<p>The theorem is proved by <strong><em>delaying a message at a crucial point</em></strong> during the execution &amp; thus steering the algorithm execution 
+away from consensus being achieved. The delaying of message is attributed to a faulty process - <strong>crashed or slow process</strong>. 
+And in an asynchronous system it's impossible to distinguish between slow process &amp; crashed process. </p>
+<p>This leads to the dilemma between two choices:</p>
+<ul>
+<li>whether to wait(slow process) which can lead to indefinite block if the process has actually crashed.</li>
+<li>proceed further(crashed process) by resetting the execution(disabling the current execution to ensure safety). 
+    However, in this case, a future reset is imaginable &amp; the process continues endlessly.</li>
+</ul>
+<p><strong><em>In the case of Paxos, Rule-2 disables previous proposals as it starts a new proposal which can itself get disabled by a future proposal 
+as illustrated earlier.</em></strong></p>
+<p>In practice this is not a major problem and the issue can be avoided by using a reasonable timeout to give enough time to complete
+the execution or by using randomization to avoid getting into a dueling situation(illustrated earlier using two proposers stepping on each
+other's execution).</p>
+</details>
+<h3 id="multi-paxos">Multi-Paxos<a class="headerlink" href="#multi-paxos" title="Permanent link">&para;</a></h3>
+<p>Practical systems require that a series of values be decided instead of just one value. The decided values are added to a log 
+with each decision going into an index in the log &amp; since all acceptors will have the same log it is referred to as replicated log, shown below.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>        *                                                   x
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>        |                                                   |     
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    *   x   *       *                                       x   *   x
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    |   |   |       |                                       |   |   |
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    x   x   x   *   x                               *   *   x   x   x   *   *
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    |   |   |   |   |                               |   |   |   |   |   |   |
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  +---+---+---+---+---+                           +---+---+---+---+---+---+---+ 
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>  | 1 | 2 | 3 | 4 | 5 |                           | 1 | 2 | 3 | 4 | 5 | 6 | 7 |  
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>  +---+---+---+---+---+                           +---+---+---+---+---+---+---+ 
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>                                                  &lt;--L1--&gt;|&lt;~~~~~~~~~&gt;|&lt;--L2--&gt;    
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>                                                          |&lt;-------L2--------&gt;|                
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>  Fig.a: Multiple instances of Paxos,             Fig.b:     
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>  each instance chooses value for one slot.       &lt;----&gt;: Leader is established
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>  Vertical lines indicate Paxos run(proposals)    &lt;~~~~&gt;: Leader has died, multiple  
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>                                                          proposers are vying for leadership. 
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>                                                          Holes are possible, 4 is accepted 
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>                                                          while 3 &amp; 5 aren&#39;t accepted. 
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>                                                          Once L2 establishes it&#39;s leadership it will 
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>                                                          consolidate the log(partially accepted values) &amp; 
+</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>                                                          continue being a sole leader starting from index 6.   
+</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>
+</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>  x: partially accepted value
+</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>  *: consensus achieved
+</span></code></pre></div>
+<p>For realizing a replicated log multiple instances of paxos can be run as shown in the above diagram on the left side with value
+in the proposal now consisting of: <strong><em>&lt; index, value &gt;</em></strong>. However this is not an efficient implementation. In a more practical implementation 
+a single proposer(called leader) can issue just accept requests for multiple slots as shown in the above diagram on the right side. 
+Leader is selected through leader election &amp; leader maintains authority(single leader exists) using heart beat mechanism, 
+other proposers won't vie for leadership as long as they receive heart beat messages. </p>
+<p><strong>committing a value:</strong>
+A replicated log basically provides a fault tolerant layer using which distributed applications(like db, object storage etc) can be built. 
+Once a value is chosen it can be used by application layer - this is called commit, note that all the values in the log need to be committed in a serial order. 
+Since only the leader knows consensus was achieved the commit index also needs to be communicated to the acceptors.
+The leader can propose values for multiple slots simultaneously, so it is possible a proposal for greater numbered index to get accepted before a proposal 
+for lesser numbered index is accepted i.e holes are possible in the log. In this case the greater numbered index can't be committed till values for all 
+lesser numbered indices are also committed.</p>
+<p><strong>handling leader failure:</strong>
+The leader can fail while proposing values so there can be multiple indices which are partially accepted. A new leader needs to be elected, 
+the elected leader runs consensus(both propose &amp; accept) for all slots greater than the commit index. There can be multiple proposals for the partially accepted 
+slots if elected leader dies soon after being elected in the middle of proposal.</p>
+<p>Once a stable leader is established &amp; it resolves all the partially accepted indices. There after it can continue with normal operation wherein it would just 
+issue accept &amp; commit requests.</p>
+<p>Note that multi-paxos is note well documented, the above description is only rough sketch. Practical implementation would have to consider many 
+things adding/removing or increasing/decreasing the no. of acceptors in system, materializing the log to application state, application state
+transfer among acceptors for recovery in order to bring the acceptor to latest system state etc. </p>
+<h3 id="whats-next">What's Next<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h3>
+<p><strong>Basic Paxos:</strong>
+Leslie Lamport first developed Paxos as voting algorithm which uses shared memory model. If you are still not clear with above explanation you can check 
+out the voting algorithm here (you will get to learn TLA+ as well):</p>
+<ul>
+<li><a href="https://www.youtube.com/watch?v=tw3gsBms-f8">The Paxos algorithm or how to win a Turing Award. Part 1.</a></li>
+<li><a href="https://www.youtube.com/watch?v=8-Bc5Lqgx_c">The Paxos algorithm or how to win a Turing Award. Part 2.</a></li>
+</ul>
+<p>You can also check out: 
+Lampson's <a href="https://www.microsoft.com/en-us/research/uploads/prod/1996/10/Acrobat-58-Copy.pdf">How to Build a Highly Available System Using Consensus</a>.
+&amp; <a href="https://www.youtube.com/watch?v=JEpsBg0AO6o">Paxos lecture (Raft user study)</a></p>
+<p><strong>Multi-Paxos &amp; Reconfiguration:</strong>
+Two things complicate Paxos: need to choose multiple values for practical applications &amp; change the acceptors in the system.</p>
+<p>Multi-paxos is not well documented, one can look into the formal specification of <a href="https://arxiv.org/abs/1606.01387">multi-paxos</a>.  </p>
+<p>In distributed systems it is a given that hosts will fail ultimately. 
+Hence the group of acceptors need to be changed: either replace an acceptor eventually or increase/decrease the no. of acceptors in the group 
+to alter fault tolerance. To understand more about the same you can see 
+<a href="https://www.cs.cornell.edu/courses/cs7412/2011sp/paxos.pdf">Paxos made moderately Complex</a> &amp; <a href="https://lamport.azurewebsites.net/pubs/vertical-paxos.pdf">Vertical Paxos</a>. </p>
+<p><strong>Distributed Lock:</strong>
+One practical application of paxos is to hold distributed locks in a fault tolerant manner: 
+<a href="https://static.googleusercontent.com/media/research.google.com/en//archive/chubby-osdi06.pdf">Chubby service</a> &amp; <a href="https://www.usenix.org/legacy/event/atc10/tech/full_papers/Hunt.pdf">Zoo keeper</a>.</p>
+<p><strong>Practical Implementation:</strong>
+For challenges concerning production grade implementation you can check out <a href="https://www.cs.utexas.edu/users/lorenzo/corsi/cs380d/papers/paper2-1.pdf">Paxos made live</a>.</p>
+<p>Perhaps, basic Paxos is simple to understand, it is the combination of reconfiguring a paxos group, multi-paxos, implementing a 
+service like distributed locking using consensus &amp; operating a production grade system is what poses challenges.  </p>
+<p><strong>Replicated log:</strong>
+Apart from Paxos, View Stamp Replication(VSR), ZAB &amp; Raft are replication based algorithms which can be used for realizing a replicated log.  </p>
+<p>A replicated log is considered to be a fundamental higher level primitive for building distributed systems. 
+Jay Kreps has written about it here in a <a href="https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying">blog post</a> &amp; later wrote a <a href="https://www.oreilly.com/library/view/i-heart-logs/9781491909379/">short book</a>. 
+<br><a href="https://www.usenix.org/conference/nsdi12/technical-sessions/presentation/balakrishnan">Corfu</a> talks about implementing various distributed systems 
+like transactional KV store, databases etc &amp; AuroraDB views <a href="https://assets.amazon.science/dc/2b/4ef2b89649f9a393d37d3e042f4e/amazon-aurora-design-considerations-for-high-throughput-cloud-native-relational-databases.pdf">log as the database</a>. </p>
+<p>Hence Paxos is a very fundamental algorithm for distributed systems. </p>
+<p><strong>Variants:</strong> For different variants of paxos you can checkout: <a href="https://paxos.systems/variants/">https://paxos.systems/variants/</a></p>
+<p><strong>Trivia:</strong>
+Lastly, it would be interesting to read about the initial reception about <a href="https://lamport.azurewebsites.net/pubs/pubs.html#lamport-paxos">paxos</a> &amp; a subtle 
+bug referred to <a href="https://lamport.azurewebsites.net/pubs/pubs.html#paxos-simple">here</a> due to interpretation by the readers which Lamport doesn't want to disclose 
+is, perhaps, this <a href="https://brooker.co.za/blog/2021/11/16/paxos.html">one</a>.</p>
+
+
+
+  
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+            Back to top
+          </button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "toc.follow", "content.action.edit", "navigation.top"], "search": "../../assets/javascripts/workers/search.74e28a9f.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.220ee61c.min.js"></script>
+      
+    
+  </body>
+</html>
