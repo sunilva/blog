@@ -1,0 +1,92 @@
+site_name: Slow Host
+theme:
+  name: material
+  #custom_dir: overrides
+  features:
+    #- navigation.instant
+    - navigation.tabs
+    #- navigation.tabs.sticky
+    #- navigation.sections
+    #- navigation.expand
+    #- navigation.path
+    #- navigation.prune
+    #- navigation.indexes
+    - toc.follow
+    - content.action.edit
+    #- content.action.view
+    #- toc.integrate
+    - navigation.top
+  palette: 
+    # Palette toggle for light mode
+    - scheme: default
+      toggle:
+        icon: material/lightbulb 
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Reading List: reading.md
+  - Bookmarks: bookmarks.md
+  - About: about.md
+  #- Blog: blog/index.md
+
+plugins: 
+  #- blog
+      
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - md_in_html
+  - def_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:materialx.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: squidfunk
+      repo: mkdocs-material
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - pymdownx.critic
+extra_css:
+  - stylesheets/extra.css
+
+# extra:
+#   social: 
+  # - icon: fontawesome/brands/github-alt
+  #   link: https://github.com/sunilva
+  # - icon: fontawesome/brands/twitter
+  #   link: https://twitter.com/sunilva
