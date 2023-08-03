@@ -15,11 +15,11 @@ from being achieved. <br>This is the famous [FLP result](https://www.cs.cornell.
 ### **Posts**
 #### 2023
 ##### Aug 
-*2023-08-02* - [Understanding Paxos Using Three Simple Rules](blog/paxos/paxos.md)<br>
+*2023-08-02* - [Understanding Paxos Using Three Simple Rules](paxos/understand-paxos.md)<br>
 
 ##### Aug
-*2023-08-03* - [Analyzing View Stamp Replication](blog/vsr/analyze-vsr.md)<br>
-*2023-08-03* - [TLA+ Spec for View Stamp Replication](blog/vsr/vsr-tla.md)<br> 
+*2023-08-03* - [Analyzing View Stamp Replication](vsr/analyze-vsr.md)<br>
+*2023-08-03* - [TLA+ Spec for View Stamp Replication](vsr/vsr-tla.md)<br> 
 
 ### **Upcoming**
 1. TLA+: A Design Tool for Distributed Systems
