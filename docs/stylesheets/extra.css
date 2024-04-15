@@ -1,14 +1,15 @@
 .md-grid {
-    max-width: 1150px;    
+    max-width: 1200px;    
   }
   
 .md-sidebar--secondary {
-    order: 0;
+    order: 1;
     text-align: left;
     text-justify: left;    
 }  
 .md-main {
     text-align: justify;
     text-justify: inter-word;
+    line-height: 0.5;
 }
 

@@ -4,224 +4,294 @@ hide:
   - navigation
 ---
 
-### Problem statement & definitions 
-The problem of consensus is defined as a group of processes agreeing on a single value.
+### Introduction
 
-Formally, consensus needs to address the following three conditions:
+#### Fault Tolerant System
+Consider a client server system, clients can send requests to the server. The server changes it’s state as it serves the client requests. For instance, a seat reservation system reduces the number of available seats & sends a confirmation to the client. The server can be abstracted as a state machine. 
 
-* Agreement: All correct processes decide on the same value. 
-* Validity: The value agreed upon is actually proposed(*this is to avoid trivial solutions, all processes can simply decide a fixed value no matter what, say, 42*).  
-* Termination: Eventually all correct processes reach a decision. 
+A state machine(SM) starting in certain state(*some number of available seats*) transitions to new state(*reduced number of available seats*) by executing a command taken as a input(*client request*) while producing an output(*reservation confirmation*). 
 
-The first two are safety properties & last one is liveness property.
+If the next state of a state machine depends completely on the input being executed then it is said to be deterministic. A set of deterministic state machines will behave identically if they^[1](https://www.cs.cornell.edu/fbs/publications/SMSurvey.pdf)^: 
 
-**Acceptors & proposers:**
-The processes(*or hosts*) are divided into a set of acceptors & proposers(*ignoring learners*).
-Proposers propose to acceptors in order to choose a value. It is possible for a single process to be an acceptor & proposer 
-but for simplicity we will consider acceptors & proposers to be distinct. 
+- start in the same initial state.
+- execute the same set of commands.
+- excute the commands in the same sequence.
 
-**Asynchronous system**: The processes are connected by a network & communicate with each other by exchanging messages.
+Such a set of state machines is called a replicated state machine(RSM). A RSM can sustain some of the server(henceforth called process) failures and hence provide fault tolerance. As you can see the group of servers constituting RSM need to agree on the set & order of the commands to be executed, that brings us to consensus.
 
-* *Processes:* Processes can crash & restart, processes are equipped with stable storage. Processes can take arbitrary time to execute & respond back to a message. 
-  The set of acceptor processes is fixed & known a priori. A process uses stable storage to remember critical information when it restarts after crashing.  
+#### Problem definition
+Consensus is defined as a group of processes agreeing on a single value(*i.e client request to be executed*). 
+Consensus needs to address the following three conditions:
 
-* *Network*: Messages can get arbitrarily delayed in the network. Messages can get duplicated, be delivered out-of-order & get lost. However the network 
-  is considered to be reliable in the sense that if the sending process retries indefinitely then message will be delivered, eventually. 
-   
-* *Communication(timing)*: Since processes & network don't provide any guarantee w.r.t time no timing assumptions are made. 
-  Processes can't use clock to accurately measure time interval or determine an epoch. 
+* Agreement: A single value is chosen.
+* Validity: The value agreed upon value is actually proposed(*this is to avoid trivial solutions, all processes can simply decide a fixed value, say 42, no matter what).
+* Termination: Eventually a value gets chosen.
 
-!!! warning ""
+The first two are safety properties & last one is liveness property^[2](https://en.wikipedia.org/wiki/Safety_and_liveness_properties)^.
+
+If a group of processes are able to agree on single value(*basic or single decree paxos*) then the solution can be extended to agree on a sequence of values(*multi paxos*) which will be useful in realizing a RSM. 
+
+#### Environment
+An algorithm needs to consider the environment in which it is supposed to work.
+The processes are connected by a network & communicate with each other by exchanging messages, the processes & network together are referred to as a system. 
+
+* *Processes:* 
+    - A process can take arbitrary time to respond back to a message. 
+    - A Process can crash & restart. Since consensus is impossible if a process forgets everything after a crash, 
+      it is assumed that processes can use stable storage to remember certain information across a crash. 
+
+* *Network*: 
+    - Messages can get arbitrarily delayed in the network. 
+    - Messages can get duplicated, be delivered out-of-order or get lost. 
+    - The network is considered to be reliable in the sense that if the sending process retries then message will be delivered, eventually. 
+
+Since the processes & network don't provide any guarantees w.r.t time the system is said to be **asynchronous**.
+The above conditions mean that the algorithm need to be devised without relying on **time** for it to be robust & work correctly(ensure safety).
+
+!!! note "Failure Detection"
     *A fundamental problem in an asynchronous distributed system is that it is impossible to tell ***whether a process has crashed or slowed down***.*
-    <br>*Hence, it becomes imperative to ***neutralize a slow process's execution*** in order to proceed further so as to avoid adverse effects(ensure "safety").*
-    ??? question "Why can't failure be detected using a ping"
-        The expected time to receive a reply for a ping can't be bounded as, by definition, a process can take arbitrary time to reply back & 
-        the time delay in network is unbounded.  
+    
+    **Why can't failure be detected using a request-response mechanism ?**
+        <br>The expected time to receive a reply for a ping request can't be bounded as, by definition, a process can take arbitrary time to respond back 
+        & the network transit time delay for a message is also unbounded.
 
-**Quorum:** Any sub set containing at least a majority of elements of a set is called a quorum. Given a set, any two quorums contain at least one element in common. 
-<br>This key property is leveraged in ensuring safety property: ***single value is chosen, always***. 
-<br>We will assume the system contains ***2N + 1*** acceptors, at least ***N+1*** acceptors are required to form a quorum.
+### Consensus
+**Acceptors & proposers:**
+The processes are divided into a set of proposers & acceptors. Proposers propose to acceptors in order to choose a value. 
+It is possible for a single process to be an acceptor & proposer but for simplicity we will consider acceptors & proposers to be distinct.
 
-**Choosing a value**: If a value is chosen by a quorum of processes, then chosen value can be learnt by querying a quorum of processes. 
-Hence a group of ***2N + 1*** acceptors can sustain up to ***N*** acceptor failures. Thus the processes provide fault tolerance.   
+**Single fixed proposer**:
+A single proposer accepts requests, chooses one among them & proposes to all the acceptors. This solution doesn't work as it can't make any progress if the fixed proposer fails. 
+If a new proposer is needed to step-in then it needs to do two things: 
 
-!!! success "Choosing a value"
-    *A value is considered to be chosen if it is **accepted by a quorum of processes**.*
-    <br>*At <u>no point in time</u>, two different proposers should have different values accepted by a quorum of acceptors.*
- 
+* Ensure that the old proposer doesn't affect the system adversely if it comes back(the old one din't fail but slowed down, as discussed earlier it can't be said derterministically if a process has failed).
+* Reconcile the current system state & accordingly propose a value to ensure safety.
+
+**Multiple proposers**:
+Multiple proposers accept requests & propose to the acceptors. Acceptors accept only once & a value is considered to be chosen if it gets accepted by a majority of the acceptors. Since any two majorities have atleast one acceptor in common & acceptors accept once - only a single value can be chosen. However this solution doesn't work if:
+
+* No majority accepts a single value amidst multiple concurrent proposals.
+* An acceptor in the majority dies after a value had been chosen.
+
+Note that if there are **2N+1** acceptors then **N+1** or more acceptors form a majority, since majority acceptance is sufficient 
+to choose a value, upto **N** acceptor failures can be sustained.
+
+!!! note "Single vs Multiple Proposers"
+    Paxos assumes multiple proposers & builds upon it dealing with two fundamental problems in distrbuted systems viz. **concurrency & failure**. **Concurrency** is hard to reason about while **failure** can't be ascertained in an asynchronous system, deterministically. Moreover a proposer or an acceptor may fail at any moment(the algorithm needs to be safe).
+
+    Replication algorithms like Raft, View Stamped Replication(VSR) & Zookeeper Atomic Broadcast(ZAB) build upon single fixed proposer approach. They aren't 
+    consensus algorithms but implement RSM.
+
+==quorum trick: global state local knowledge, space time resolution, concurrecny resolution.==
 ### The Three Rules
 #### <u>Rule One: Multiple Rounds</u>
 
-Suppose acceptors are allowed to accept only once & there are two concurrent proposals i.e one for value ***a*** by proposer **P1** 
-& another for value ***b*** by proposer **P2**. Now, assume ***N*** acceptors accept value ***a*** , another ***N*** acceptors accept value ***b*** 
-& the remaining one has failed. Under this scenario there is no further progress possible unless more proposal attempts are made.
-  
-```title="Why can't we have a single proposer, always ?"
-That single proposer can die or can become slow. 
-If a proposer becomes slow then another proposer steps in, at this point the slow proposer 
-can come back again. Thus we have two concurrent proposals.
+Owing to **concurrency & failure** problems discussed in the previous section, more than one proposal may be required to achieve consensus. 
 
-Remember we can't distinguish between slow & crashed processes.
-Note that there can be more than two concurrent proposals.
-```
+* If no majority is achieved owing to multiple simultaneous proposals then a new proposal needs to be tried to achieve consensus. 
+* If an acceptor fails after a majority is achieved then new proposal should re-establish the majority for the same value. Accordingly acceptors should be allowed to accept more than one proposed values.  
 
-!!! note "Rule One: Multiple Rounds"
-    ***<center><span style="color:blue">Due to concurrent proposers, more than one proposal may be needed for choosing a value. 
-    <br><u>Safety:</u> Even with concurrent proposals a single value should be chosen, always.</span>***
+**Proposal Numbers**: Since multiple proposals are involved they need to be numbered. Each proposal carries a proposal number & value being proposed. 
+Paxos is based on two simple invariants viz. 
 
-***Note:*** Since multiple proposals are required, each proposal is numbered & the proposals are assumed to be totally ordered(*monotonically increasing*). 
-A proposal is now expressed as: ==*< proposal-number, value >*==. In each proposal first a query is made to know the current status & then a value is
-proposed for consensus.  
+* Single value is proposed for a given proposal number. A proposal number can't be reused to propose a different value.
+* Once consensus is achieved for a certain value then all subsequent proposals can achieve consensus only for that value. 
 
-#### <u>Rule Two: Kill The Past</u> 
-<todo query & set> <todo search host reference>
+To meet condition one each proposer chooses proposal numbers from disjoint sets to avoid reuse across proposers & a proposer can simply store the last proposal number used by itself to prevent reuse by self. For condition two total order of proposal numbers is required(notice the word *subsequent*), also a two phase protocol discussed below becomes imperative. 
+
+Proposal number is constituted using two integers ***< I,J >***. Each proposer is numbered uniquely & this constitutes the second part ***"J"*** of the proposal
+number which will ensure that the proposal numbers are unique to the proposer & doesn't get reused across proposers. For instance proposer one will use 11, 21, 31 etc, while 
+proposer two will use 12, 22, 32 etc & so on. The first part of proposal number ***"I"*** is a monotonically increasing number. A proposer, at the start of each new proposal, queries a quorum of acceptors to know about all past proposals & chooses a new ***"I"*** such that the new proposal number is greater than all the past proposals.
+
+**Two phase protocol:** At the start of each new proposal, first a query is made to atleast a majority of acceptors 
+to know the system state & then a value is considered for current proposal. The query phase is called **prepare** & propose phase is called **accept**. Restrictions are put on what value can be proposed which is discussed in the next two rules, this rule is more about multiple porposals & how proposal numbers need to be chosen. 
+
+Note that there can multiple simultaneous ongoing proposals but no two proposals should achieve consensus for different values.
+
+!!! note "Rule One: Mutliple proposals may be required to achieve consensus"
+    ***<center><span style="color:blue">Due to concurrency & failure, more than one proposal may be needed to achieve consensus. A single value is 
+    proposed in each proposal & proposals are totally ordered(those which start later have a higher proposal number).</span>***
+
+#### <u>Rule Two: Kill The Past</u>
 Consider the situation in the below diagram:
 ``` title="An acceptor common between two proposals hasn't accepted any value"
 
-    |<---P1--->|            * Proposals P1 & P2 have an acceptor "A" in common, P2 > P1.
-    +------+---+------+     * "A" hasn't accepted a value from P1, A.value = nil.  
-    |  N1  | A |  N2  |     * N1 & N2 don't have anything in common.
-    +------+---+------+
+    |<---P1--->|            * N1 & N2: Process groups consisting of N acceptors each.
+    +------+---+------+     * Proposals P1 & P2 have an acceptor "A" in common, P2 > P1.
+    |  N1  | A |  N2  |     * "A" hasn't accepted a value from P1, A.value = nil.  
+    +------+---+------+     * N1 & N2 don't have any other acceptor in common.
            |<---P2--->|    
 ```
 
 1. Acceptor **"A"** which is common between proposals **P1** & **P2** hasn't accepted any value.
-2. It is not possible for proposal **P2** to know what value acceptors in **"N1"** have accepted(or will accept in future).
+2. Since acceptors in **N1** are not involved in **P2**, it is not possible for proposal **P2** to know what value 
+acceptors in **N1** have accepted(or will accept in future & achieve consenus).
 3. **P2** can choose to propose any value, however it should ensure that a different value is not chosen by **P1**.
-4. To deal with above situation, before proposing a value in proposal **P2**, proposer 
-   for **P2** extracts a promise from acceptor **"A"** not to accept any proposal lesser than itself.
-5. Hence proposal **P1** will not be able to achieve acceptance from a quorum i.e **P2** just killed **P1**.
-6. There could be more than one proposal before **P2**, all those proposals in which *<u>at least one common acceptor</u>* hasn't yet accepted a value
-   will be killed by **P2**.
+4. To deal with above situation, proposer for **P2** makes a prepare request & extracts a promise from acceptors in **N2** & **"A"** 
+not to accept any proposal lesser than itself.
+5. Hence proposal **P1** will not be able to achieve acceptance from a majority i.e **P2** just killed **P1**.
+   Note that a quorum of acceptors (**N2** + **A**) have moved to a higher numbered proposal hence **P1** will not be able to achieve consensus.
 
+Note: 
+
+* There can be more than one acceptor common between two proposals.
+* There could be more than one proposal before current proposal, all those proposals in which *<u>at least one common acceptor</u>* hasn't yet accepted a value will be killed by current proposal.
 
 !!! note "Rule Two: Kill The Past"
-    ***<center><span style="color:blue;">Extract a promise from acceptors participating in the current proposal not to accept any proposal lesser than 
-            the current one.***</span>
+    ***<center><span style="color:blue;">Extract a promise from acceptors participating in the current proposal not to accept any proposal having proposal number lesser than the current one. Once a promise has been extracted from a quorum, some of the ongoing proposals(in prepare or accept phase) which have a lesser proposal number can't achieve consensus.***</span>
 
 #### <u>Rule Three: Past Is Prologue</u>
 
-=== "Single Accepted Value From Past Proposal"
+=== "Single Accepted Value From Previous Proposal"
       <center>**Note: Make sure you read next tab after reading this one.**</center>
       ```title="Acceptor A which is common between proposals P1 & P2 has accepted a value."
 
-      |<---P1--->|            * Proposals P1 & P2 have an acceptor "A" in common, P2 > P1.
-      +------+---+------+     * "A" has already accepted a value from P1, A.value = P1.value.
-      |  N1  | A |  N2  |     * N1 & N2 don't have anything in common.
-      +------+---+------+
+      |<---P1--->|            * N1 & N2: Process groups consisting of N acceptors each.
+      +------+---+------+     * Proposals P1 & P2 have an acceptor "A" in common, P2 > P1.
+      |  N1  | A |  N2  |     * "A" has already accepted a value from P1, A.value = P1.value.
+      +------+---+------+     * N1 & N2 don't have any other acceptor in common.
              |<---P2--->|
       ```
 
-      1. Acceptor **"A"** had already accepted **"a"** as a value from **P1** before **P2** started.
-      2. If a different value, say **"b"**, were to be chosen in proposal **P2**. 
-           * Acceptors in **"N1"** can complete the proposal **P1** which chooses **"a"**. 
-             Note that proposal **P2** doesn't has any control over the acceptors in **"N1"**.
+      1. Acceptor **"A"** has accepted **"a"** as a value from **P1**.
+      2. If a different value, say **"b"**, were to be chosen in proposal **P2** then: 
+           * Acceptors in **N1** can complete the proposal **P1** which chooses **"a"**. 
+             Note that proposal **P2** doesn't has any control over the acceptors in **N1** as they are not part of the proposal.
              It's also possible **P1** has already reached consensus.
            * Proposer for **P1** would deem **"a"** as chosen value & proposer for **P2** would deem **"b"** as chosen value.
-           * Ultimately, though a quorum has accepted **"b"** after **P2** completes, there would have been a <u>flip from **"a"** to **"b"**</u> 
+           * Ultimately, though a majority has accepted **"b"** after **P2** completes, there would have been a <u>flip from **"a"** to **"b"**</u> 
              at some point in time if proposal **P1** completes before **P2**. 
-      *  To avoid above situation, before proposing a value in proposal **P2**, the proposer tries to learn if any of the acceptors in **P2** had already 
-         accepted a value from past proposal. If so, then the previously accepted value is chosen for the current proposal **P2**.
-      *  We are still not done, what if more than one acceptor has accepted different value from different past proposals. 
+      3. To avoid above situation, before proposing a value in proposal **P2**, the proposer tries to learn if any of the acceptors in **P2** had already 
+         accepted a value from past proposal in the prepare phase. If so, then the previously accepted value is used for the current proposal **P2**.
+      4. We are still not done, what if more than one common acceptors have accepted different values from different past proposals.
          A question that arises is **which value** should be considered for the current proposal? Continue to the next tab for answer.
-      ----   
-
+         
 === "Multiple Accepted Values From Different Past Proposals"
-      <center>**Note: Make sure you have read previous tab.**</center>
-      Whenever a new proposal starts it will able to know about all the past proposals by querying a quorum of acceptor. As per quorum
-      property the current proposal will have one or more common acceptors in each of past proposals. The past proposals
-      will fall into two categories, given a past proposal & current proposal: 
+      <center>**Note: Make sure you have read previous tab before reading this one.**</center>
+      As per quorum property the current proposal will have one or more common acceptors in each of the past proposals.Hence, whenever a new proposal 
+      starts it will able to know about all the past proposals(*< proposal-number, value-proposed >*) through prepare phase.  Given a past proposal & current proposal, the past proposals will fall into two categories:
 
       * At least one common acceptor hasn't accepted a value, such proposals will be killed following **Rule-2**.      
       * One or more common acceptors has accepted a value, such proposals will be in one of these states: ***dead, ongoing or consensus achieved***. 
-        However the current proposal can't know about the status of the past proposals all by itself(*It needs to be deduced through other past proposals*). 
+        However, the current proposal can't know about the <u>status of the past proposals</u>. 
         Current proposal has to choose one value from the different values proposed in these past proposals preserving ***safety***.
-        
-        !!! note 
-            Safety requires that no two ongoing proposals choose different values.
 
-      Consider the following sequence of possibilities, beginning with two proposals **P1** & **P2** 
-      which have accepted values **aa**(both are ongoing i.e ***previous tab***) or **ab**(P2 has killed P1 i.e **rule-2**), respectively. 
-      Subsequently value to be proposed by **P3** is deduced from past proposals **P1 & P2** ensuring safety. 
-      In the process, in order to generalize, we arrive at the pattern of dead & ongoing proposals 
-      which will be used for choosing a value to be proposed by any future proposal after **P3**.  
+      Lets begin from the start. Considering the very first two proposals, two things are possible: 
 
-      <center><p><img src="/blog/paxos/paxos.png" alt="Multiple Accepted Values" width="800px"/></p></center>
-
-      <u>**Choosing value for P3:**</u>
-
-      * <u>Cases 7,3:</u> Both of these have two acceptors in current proposal which have accepted a value from different past proposals.
-   
-          * <u>case-7:</u> value corresponding to the higher numbered proposal i.e **"b"** should be used considering **safety**. Otherwise
-                           two ongoing proposals will be proposing values **"a"** & **"b"**. 
-          * <u>case-3:</u> either of them can be used, since we used higher numbered proposal w.r.t *case-7* same can be done in this case.
+      * **P2** proposal kills **P1**, the value proposed in **P2** & **P1** proposals can differ(following Rule-2). <br>We get the sequence: =="dead-ongoing"==.
+      * **P2** chooses the same value as **P1**(as discussed in previous tab), both **P2** & **P1** are ongoing. <br>We get the sequence: =="ongoing-ongoing"==.
       
-      * <u>Cases 4,8:</u>
-            Acceptors in current proposal didn't accept a value in any of the past proposals.
-            All past proposals get killed, current proposal is free to choose any value of it's choice. 
+      For the third proposal, the following below given scenarios are possible in the prepare phase when a query is made.
+      ```
+          a               b               c               d
+          ------------------------------------------------------------    
+          dead-ongoing    dead-ongoing    dead-ongoing    dead-ongoing
+             ^       ^       ^                       ^ 
+
+        ^: Indicates acceptors in current proposal respond with values accepted in the past proposals when a 
+           prepare request is made for current proposal.
+
+        a: The accepted values correspond to dead & ongoing proposal. 
+           Here value corresponding to ongoing proposal needs to be considered for current proposal 
+           to preserve safety.
+        
+        b: The accepted value corresponds to dead proposal. Since no acceptor participating in the current proposal 
+           has accepted a value from the ongoing proposal, it will get killed. 
+           So it is safe to consider the value corresponding to the dead proposal.
+        
+        c: The accepted value corresponds to an ongoing proposal. 
+           It's safe to choose this value for current proposal.
+        
+        d: None of the accceptors in current proposal have accepted a value in past proposals. 
+           All the past proposals(including already dead, aha) will get killed.
+           The current proposal is free to choose any value from the wild for the current proposal. 
+      ```
+      When a new proposal **P3** starts, is it possible to get a sequence like: =="ongoing-dead"==. 
+      Yes this is possible. However, as far as the values(for safety we are concerned only with the value) are concerned it is still equivalent to =="ongoing-ongoing"==.
+      Generalizing, it is easy to see that we need to consider a sequence like: =="ddddooooo"==, dead proposals followed by ongoing proposals.
+      A sequence like =="ooddodd"== is equivalent to =="ooooooo"== as the dead proposals will have the same value as the ongoing proposals.
+
+      Given a sequence like =="ddddooooo"== & if more than one acceptor in current proposal had already accepted a value in past proposals, then it is safe to consider the value corresponding to the **highest numbered past proposal**. If the highest numbered proposal corresponds to an ongoing proposal, the sequence gets extended with another ongoing proposal. However, if highest numbered proposal cooresponds to a dead proposal then all the ongoing proposals will get killed & the new sequence will have only one ongoing proposal.
+
+      Once consensus is achieved only that value can be used in all future proposals as all future proposals will have at-least one common acceptor with
+      the proposal which achieved consensus. This holds true even if there are upto **N** failures.
+
+      Also, note that acceptors need not have to remember all the values proposed in the past proposals, the one corresponding to the highest numbered proposal is sufficient.
       
-      * <u>Rest of the cases:</u> A single acceptor in current proposal accepted a value in a past proposal, choice is obvious.
+    !!! note "Rule Three: Past Is Prologue"
+        ***<center><span style="color:blue;">If more than one acceptor participating in the current proposal had already accepted a value from different past proposals 
+        then use the value corresponding to the highest-numbered past proposal for the current proposal to ensure safety</span>.***
 
-      From here onwards, <u>highest-numbered proposal</u> refers to the largest-numbered past proposal from which an acceptor participating 
-      in the current proposal had accepted a value in the past. And by <u>accepted values</u> we mean values accepted by acceptors common between 
-      a past proposal & current proposal. 
+### Safety & Liveness
 
-      <u>**Choosing value for future proposals:**</u>
+#### Safety
+  Paxos algorithm is safe to proposer & acceptor failures, they may fail or become slow at any moment.
+  Note that acceptors in the system & their total number should be known apriori.
+  Paxos can sustain upto **N** acceptor failures given **2N+1** acceptors, if more than **N** acceptors fail then it can't make progress as majority is needed.
+  However system remains safe & can continue operation once the acceptors restart. Paxos is safe even if there are multiple simultaneous proposals. 
+  Any number of proposers may fail, or a proposal can simply be abandoned in the middle. 
 
-      * <u>cases 2 to 8:</u>The pattern observed is ongoing proposals follow dead proposals, e.g: ==**dddooo**==. 
-      All the ongoing proposals will be choosing same value. 
-      If two accepted values are considered then the pattern will be one of these: ==**dd**==, ==**do**==, ==**oo**==.<br>
-      In this case as well highest numbered proposal needs to be considered for future proposal greater than **P3**.
-      The same reasoning can be extended if there are more than two accepted values.
-        
-      * <u>case-1:</u> The dead proposal had same value as the ongoing proposals. If we consider
-      first two as accepted values the pattern is ==**od**==, in this case as well higher numbered proposal can be used so that it **resolves
-      uniformly** with all the other cases. In general, suppose the pattern is ==**ooooo**== & any proposal barring the first one gets killed, then above pattern results.
+  **Moment of consensus**: Consensus is achieved at the moment the last acceptor in the quorum accepts a value. At this moment neither an acceptor nor the proposer know that 
+  consensus has been achieved. At this moment either the proposer or an acceptor may fail, however consensus can be achieved again with a new proposal but for the same value.
+  It is easy to reason about proposer failure. If an acceptor had failed then new majority will need atleast one acceptor from the quorum which had achieved consensus earlier - thus past consensus value makes it's way to the subsequent proposals.
 
-      <u>**Choosing value after consensus is achieved:**</u> 
-      <br>Once consensus is achieved, one or more concurrent future proposals will choose consensus proposal 
-      for highest-numbered proposal(*since a quorum of acceptors would have accepted a value*). For all future proposals, either 
-      consensus proposal or one of those following it will be chosen for highest-numbered proposal. 
-      *Cases 4,8* are not possible. Also, notice that up to **N** failures can be sustained.
+  Paxos is safe to message delay, drop, duplication & re-order. The sending & receiving of messages is just an additional detail, safety of the Paxos algorithm is 
+  ensured by how proposers & acceptors handle the messages.
 
-    !!! note ""
-        In all the cases, value corresponding to the ***highest-numbered proposal*** should be used for current proposal.
+#### Liveness
+Note that initially we stated that eventually a value should be decided by all correct processes. 
+Under certain condition this is not possible, this is not a serious limitation though & can be circumvented for practical purposes.
 
-    ??? note "Paxos Recursion"
-        
-        If you remember, earlier it was said current proposal can't know the status(*dead,ongoing or consensus*) of past proposals all by itself. 
-        By choosing value corresponding to the highest-numbered proposal it implicitly gets to know about the status of past proposals(*what's shown in
-        the table above is base case*). 
+**Rule-2** causes liveness issue, lets say an ongoing proposal is killed & new one starts. But then the current proposal can get killed by a future proposal 
+& the process can continue endlessly. Hence a value never gets chosen. The scenario is illustrated in the diagram below.
+There are two proposers & for simplicity a single acceptor(common between the two proposals) is being shown. It keeps on rejecting 
+the proposals as it keeps getting higher numbered prepare requests before an accept request.
 
-        The recursive nature of Paxos is depicted below. While the value corresponding to the highest-numbered proposal gets chosen for current proposal, 
-        those shown in grey boxes(*no common acceptor had accepted a value for proposals between highest-numbered proposal & current proposal*) will get 
-        killed by the current proposal. The highest-numbered proposal would have done the same earlier(i.e deduce status), ensuring safety(*refer above table*). 
+```title="Paxos liveness issue due to livelock"
 
-        !!! note ""
-            ```mermaid
-                graph LR
-              
-                A[dead]---B[highest]---C([dead])---D([ongoing])---E[highest]---F([ongoing])---G([ongoing])---H([dead])---I([ongoing])---J[current]
-                
-                J-->E-->B
+P1 ---<1>---------[1,a]----<3>---------------[3,a]----      <n>: proposal request
+        \           \       \                  \            [<proposal-no>, <value>]: accept request  
+         \           \       \                  \           x: rejected
+A1 ------<1>---<2>----x------<3>----x----<4>-----x---
+               /                   /      / 
+              /                   /      / 
+P2 ---------<2>----------------[2,b]----<4>----------
+```
 
-                style F fill:#818589
-                style G fill:#818589
-                style H fill:#818589
-                style I fill:#818589
-            ``` 
-    ----
+The above liveness issue is attributed to FLP result, which states that consensus is not possible in an asynchronous system even if there is 
+a single process failure(*which occurs in the nick of time thus preventing consensus from being achieved*).
 
-!!! note "Rule Three: Past Is Prologue"
-    ***<center><span style="color:blue;">If more than one acceptor participating in the current proposal had already accepted a value from different past proposals 
-    then use the value corresponding to the highest-numbered past proposal for the current proposal to ensure safety</span>.***
+??? "FLP in the context of Paxos" 
+    Liveness issue discussed above is attributed to the famous FLP proof which asserts that consensus is **impossible even with a single faulty 
+    process** in an asynchronous system. What FLP really means is that consensus is not possible **sometimes** under certain conditions. 
+    Consider the below excerpts taken from the FLP paper.
+
+    !!! warning ""
+        **“window of vulnerability”** - an interval of time during the execution of the algorithm in which the delay or inaccessibility 
+        of a single process can cause the entire algorithm to wait indefinitely.
+
+    !!! warning ""
+        the stopping of a single process at an **inopportune time** can cause any distributed commit protocol to fail to reach agreement. 
+      
+    The theorem is proved by ***delaying a message at a crucial point*** during the execution & thus steering the algorithm execution 
+    away from consensus being achieved. The delaying of message is attributed to a faulty process - **crashed or slow process**. 
+    And in an asynchronous system it's impossible to distinguish between slow process & crashed process. 
+    
+    This leads to the dilemma between two choices:
+
+      * whether to wait(slow process) which can lead to indefinite block if the process has actually crashed.
+      * proceed further(crashed process) by resetting the execution(disabling the current execution to ensure safety). 
+        However, in this case, a future reset is imaginable & the process continues endlessly.
+
+    ***In the case of Paxos, Rule-2 disables previous proposals as it starts a new proposal which can itself get disabled by a future proposal 
+    as illustrated earlier.***
+
+Paxos suggests to elect a single distinguished proposer called leader. If the leader is given sufficient time to complete both the phases(prepare & accept) & the system(proposer, acceptors & network) is working properly then consensus will be achieved. Note that the liveness issue doesn't disappear but it is cleverly diverted to leader election(where it prevails). Sloppy timeouts can be used so that there aren't many proposers at the same time.  
 
 ### Paxos Algorithm
-#### **<u>Two phase protocol</u>** 
-To satisfy ***Rule-2 & Rule-3*** Paxos runs in two phases viz. ***prepare & accept***. 
-Rules are applied during the **prepare** phase which is followed by **accept** phase to propose a value.      
+The complete paxos algorithm is summarised below:
 
-??? info "Paxos Protocol"
+!!! info "Complete Paxos Protocol"
     ```
     Phase 1. (a) A proposer selects a proposal number n and sends a prepare
              request with number n to a majority of acceptors.
@@ -249,100 +319,9 @@ Rules are applied during the **prepare** phase which is followed by **accept** p
         acceptors are part of the quorum during accept phase. However, checkout this 
         [potential bug](https://brooker.co.za/blog/2021/11/16/paxos.html).
 
-#### **Safety & Liveness**
-    
-##### Safety
-<u>***Concurrency:***</u>
-Paxos uses a quorum whenever a new proposal starts which allows it to know about all past proposals.
-Given a current proposal there are only two possibilities w.r.t past proposals. 
+### Replicated State Machine(RSM)
 
-* at least one acceptor in the current proposal hasn't accepted any value in past proposals or 
-* one or more acceptors in the current proposal have already accepted a value prior to current proposal 
-  which can potentially complete along with current proposal. 
- 
-Accordingly, ***Rule-2 and Rule-3*** are applied to kill and choose a value for next proposal ensuring safety until a value gets chosen. 
-Once a value is chosen only ***Rule-3*** gets applied which ensures consensus value is used for all future proposals.
-
-***<u>Failure:</u>***
-Paxos is resilient to proposer failures as it is safe for concurrent proposals.
-Acceptor failures are sustained due to quorum technique. 
-
-<u>***Totally ordered, unique proposal numbers:***</u>
-Paxos requires proposal numbers to be total ordered & unique. 
-
-This can be ensured if all proposers choose the proposal numbers from disjoint sets which are monotonically increasing. 
-For instance, this can be done by having the proposal number to be concatenation of a monotonically 
-increasing integer number & acceptor number(acceptors are numbered 1 through n). 
-
-The first part of the proposal number can be constructed by contacting a quorum of acceptors to know about highest numbered proposal 
-& incrementing the first part of the proposal for next proposal.
-
-<u>***Out-of-order message delivery:***</u>
-Since accept phase is started after prepare phase completes out-of-order message delivery is safe.
-If quorum used in prepare & accept differ then some of the hosts will receive accept message without receiving any prepare request.
-In such a case acceptors should [update the proposal number](https://brooker.co.za/blog/2021/11/16/paxos.html) as well(*which is done in prepare phase*).
-
-<u>***stable storage:***</u> Paxos requires acceptors to remember the accepted value if an acceptor crashes & restarts. An acceptor 
-stores the accepted value on stable storage before replying back to the proposers.  
-
-##### Liveness
-Note that initially we stated that eventually a value should be decided by all correct processes. 
-Under certain condition this is not possible, this is not a serious limitation though & can be circumvented for practical purposes.
-
-**Rule-2** causes liveness issue, lets say an ongoing proposal is killed & new one starts. But then the current proposal can get killed by a future proposal 
-& the process can continue endlessly. Hence a value never gets chosen. The scenario is illustrated in the diagram below.
-There are two proposers & for simplicity a single acceptor(common between the quorums) is being shown. It keeps on rejecting 
-the proposals as it keeps getting higher numbered prepare requests before an accept request.
-
-```title="Paxos liveness issue due to livelock"
-
-P1 ---<1>---------[1,a]----<3>---------------[3,a]----      <n>: proposal request
-        \           \       \                  \            [<proposal-no>, <value>]: accept request  
-         \           \       \                  \           x: rejected
-A1 ------<1>---<2>----x------<3>----x----<4>-----x---
-               /                   /      / 
-              /                   /      / 
-P2 ---------<2>----------------[2,b]----<4>----------
-```
-
-Note that while arriving at ***Rule-1*** the necessity for multiple proposers was introduced in the context of faulty proposer(crashed or slow). 
-Paxos simply assumes multiple proposers & hence the above issue. The solution it suggests is to have a single distinguished proposer called leader.
-The liveness issue doesn't vanish but it is cleverly diverted to leader election(where it prevails). 
-If the leader is given sufficient time to complete both the phases & the system(proposer, acceptor & network) is working properly 
-then consensus is achieved.
-
-??? "FLP in the context of Paxos" 
-    Liveness issue discussed above is attributed to the famous FLP proof which asserts that consensus is **impossible even with a single faulty 
-    process** in an asynchronous system. What FLP really means is that consensus is not possible **sometimes** under certain conditions. 
-    Consider the below statements taken from the FLP paper.
-
-    !!! warning ""
-        **“window of vulnerability”** - an interval of time during the execution of the algorithm in which the delay or inaccessibility 
-        of a single process can cause the entire algorithm to wait indefinitely.
-
-    !!! warning ""
-        the stopping of a single process at an **inopportune time** can cause any distributed commit protocol to fail to reach agreement. 
-      
-    The theorem is proved by ***delaying a message at a crucial point*** during the execution & thus steering the algorithm execution 
-    away from consensus being achieved. The delaying of message is attributed to a faulty process - **crashed or slow process**. 
-    And in an asynchronous system it's impossible to distinguish between slow process & crashed process. 
-    
-    This leads to the dilemma between two choices:
-
-      * whether to wait(slow process) which can lead to indefinite block if the process has actually crashed.
-      * proceed further(crashed process) by resetting the execution(disabling the current execution to ensure safety). 
-        However, in this case, a future reset is imaginable & the process continues endlessly.
-
-    ***In the case of Paxos, Rule-2 disables previous proposals as it starts a new proposal which can itself get disabled by a future proposal 
-    as illustrated earlier.***
-
-    In practice this is not a major problem and the issue can be avoided by using a reasonable timeout to give enough time to complete
-    the execution or by using randomization to avoid getting into a dueling situation(illustrated earlier using two proposers stepping on each
-    other's execution).
-
-### Multi-Paxos
-
-Practical systems require that a series of values be decided instead of just one value. The decided values are added to a log 
+Practical systems require that a set of processes agree on a series of values instead of just one value. The decided values are added to a log 
 with each decision going into an index in the log & since all acceptors will have the same log it is referred to as replicated log, shown below.
 
 ```
@@ -372,9 +351,9 @@ with each decision going into an index in the log & since all acceptors will hav
   *: consensus achieved
 ```
 
-For realizing a replicated log multiple instances of paxos can be run as shown in the above diagram on the left side with value
-in the proposal now consisting of: ***< index, value >***. However this is not an efficient implementation. In a more practical implementation 
-a single proposer(called leader) can issue just accept requests for multiple slots as shown in the above diagram on the right side. 
+For realizing a replicated log multiple instances of paxos can be run as shown in the above diagram on the left side. 
+However this is not an efficient implementation. In a more practical implementation a single proposer(called leader) can issue 
+just accept requests for multiple slots as shown in the above diagram on the right side. 
 Leader is selected through leader election & leader maintains authority(single leader exists) using heart beat mechanism, 
 other proposers won't vie for leadership as long as they receive heart beat messages. 
 
@@ -398,7 +377,8 @@ Note that multi-paxos is note well documented, the above description is only rou
 things adding/removing or increasing/decreasing the no. of acceptors in system, materializing the log to application state, application state
 transfer among acceptors for recovery in order to bring the acceptor to latest system state etc. 
 
-### What's Next 
+### Further Reading
+
 **Basic Paxos:**
 Leslie Lamport first developed Paxos as voting algorithm which uses shared memory model. If you are still not clear with above explanation you can check 
 out the voting algorithm here (you will get to learn TLA+ as well):
@@ -406,13 +386,14 @@ out the voting algorithm here (you will get to learn TLA+ as well):
 * [The Paxos algorithm or how to win a Turing Award. Part 1.](https://www.youtube.com/watch?v=tw3gsBms-f8)
 * [The Paxos algorithm or how to win a Turing Award. Part 2.](https://www.youtube.com/watch?v=8-Bc5Lqgx_c)
 
+The above two videos are highly recommended(TLA+ crash course is a bonus).
+
 You can also check out: 
 Lampson's [How to Build a Highly Available System Using Consensus](https://www.microsoft.com/en-us/research/uploads/prod/1996/10/Acrobat-58-Copy.pdf).
 & [Paxos lecture (Raft user study)](https://www.youtube.com/watch?v=JEpsBg0AO6o)
 
 **Multi-Paxos & Reconfiguration:**
-Two things complicate Paxos: need to choose multiple values for practical applications & change the acceptors in the system.
-
+Two things complicate Paxos viz. need to a series of values for practical applications & changing the acceptors(membership) in the system.
 Multi-paxos is not well documented, one can look into the formal specification of [multi-paxos](https://arxiv.org/abs/1606.01387).  
 
 In distributed systems it is a given that hosts will fail ultimately. 
@@ -435,7 +416,7 @@ Apart from Paxos, View Stamp Replication(VSR), ZAB & Raft are replication based 
 
 A replicated log is considered to be a fundamental higher level primitive for building distributed systems. 
 Jay Kreps has written about it here in a [blog post](https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying) & later wrote a [short book](https://www.oreilly.com/library/view/i-heart-logs/9781491909379/). 
-<br>[Corfu](https://www.usenix.org/conference/nsdi12/technical-sessions/presentation/balakrishnan) talks about implementing various distributed systems 
+[Corfu](https://www.usenix.org/conference/nsdi12/technical-sessions/presentation/balakrishnan) talks about implementing various distributed systems 
 like transactional KV store, databases etc & AuroraDB views [log as the database](https://assets.amazon.science/dc/2b/4ef2b89649f9a393d37d3e042f4e/amazon-aurora-design-considerations-for-high-throughput-cloud-native-relational-databases.pdf). 
 
 Hence Paxos is a very fundamental algorithm for distributed systems. 
@@ -443,6 +424,5 @@ Hence Paxos is a very fundamental algorithm for distributed systems.
 **Variants:** For different variants of paxos you can checkout: https://paxos.systems/variants/
 
 **Trivia:**
-Lastly, it would be interesting to read about the initial reception about [paxos](https://lamport.azurewebsites.net/pubs/pubs.html#lamport-paxos) & a subtle 
-bug referred to [here](https://lamport.azurewebsites.net/pubs/pubs.html#paxos-simple) due to interpretation by the readers which Lamport doesn't want to disclose 
-is, perhaps, this [one](https://brooker.co.za/blog/2021/11/16/paxos.html).
+A very nice history of consensus is published [here](https://betathoughts.blogspot.com/2007/06/).
+It would be interesting to read about how Lamport came up with [Paxos algorithm]((https://lamport.azurewebsites.net/pubs/pubs.html#lamport-paxos)) & it's initial reception. A subtle bug referred to [here](https://lamport.azurewebsites.net/pubs/pubs.html#paxos-simple) due to misinterpretation by the readers which Lamport doesn't want to disclose is, perhaps, this [one](https://brooker.co.za/blog/2021/11/16/paxos.html).
