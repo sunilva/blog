@@ -82,7 +82,6 @@ to choose a value, upto **N** acceptor failures can be sustained.
     Replication algorithms like Raft, View Stamped Replication(VSR) & Zookeeper Atomic Broadcast(ZAB) build upon single fixed proposer approach. They aren't 
     consensus algorithms but implement RSM.
 
-==quorum trick: global state local knowledge, space time resolution, concurrecny resolution.==
 ### The Three Rules
 #### <u>Rule One: Multiple Rounds</u>
 
