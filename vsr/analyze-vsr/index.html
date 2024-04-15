@@ -1,0 +1,1202 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.17">
+    
+    
+      
+        <title>Analyzing View Stamp Replication - Slow Host</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.bcfcd587.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#replicated-state-machine" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Slow Host" class="md-header__button md-logo" aria-label="Slow Host" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Slow Host
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Analyzing View Stamp Replication
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9v1Z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7M9 21v-1h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1m3-17a5 5 0 0 0-5 5c0 2.05 1.23 3.81 3 4.58V16h4v-2.42c1.77-.77 3-2.53 3-4.58a5 5 0 0 0-5-5Z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var media,input,key,value,palette=__md_get("__palette");if(palette&&palette.color){"(prefers-color-scheme)"===palette.color.media&&(media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']"),palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent"));for([key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+                
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" hidden>
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Slow Host" class="md-nav__button md-logo" aria-label="Slow Host" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    Slow Host
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+                
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#replicated-state-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      Replicated State Machine
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      Approach
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      Problem Statement
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#correctness-condition" class="md-nav__link">
+    <span class="md-ellipsis">
+      Correctness Condition
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solution" class="md-nav__link">
+    <span class="md-ellipsis">
+      Solution
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#abstract-representation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Abstract Representation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Analysis
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Analysis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#normal" class="md-nav__link">
+    <span class="md-ellipsis">
+      Normal
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#view-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      View Change
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="View Change">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#network-partitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Network Partitions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-loss-with-get-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Loss with GET-STATE
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decreasing-commit-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decreasing Commit Index
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flp-vsr" class="md-nav__link">
+    <span class="md-ellipsis">
+      FLP &amp; VSR
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      Recovery
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recovery">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#primary-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Primary Failure:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recovery-during-view-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      Recovery during view-change:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#practical-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Practical Implementation
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      Conclusion
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      References
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-title-state-transition-between-normal-or-view-change-states-for-replicas-flowchart-lr-nnormal-svcsvc-dvcdvc-n-timeoutsvc-svc-move-to-next-viewbrdvc-not-received-timeoutsvc-svc-quorum-of-svcsdvc-svc-preparecommitbrwith-higher-or-same-viewn-dvc-preparecommitbrwith-higher-or-same-viewn-dvc-start-viewn" class="md-nav__link">
+    <span class="md-ellipsis">
+      --- title: State transition between normal or view-change states for replicas --- flowchart LR N(Normal) SVC(SVC) DVC(DVC) N --&gt;|Timeout|SVC SVC --&gt;|"move to next view&lt;br&gt;(DVC not received timeout)"|SVC SVC --&gt;|quorum of SVCs|DVC SVC --&gt;|"prepare/commit&lt;br&gt;(with higher or same view)"|N DVC --&gt;|"prepare/commit&lt;br&gt;(with higher or same view)"|N DVC --&gt;|"START VIEW"|N
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+<h3 id="replicated-state-machine">Replicated State Machine<a class="headerlink" href="#replicated-state-machine" title="Permanent link">&para;</a></h3>
+<h3 id="approach">Approach<a class="headerlink" href="#approach" title="Permanent link">&para;</a></h3>
+<p>Lamport has very a <a href="https://lamport.azurewebsites.net/pubs/state-the-problem.pdf">short paper</a><sup>[1]</sup> on how a problem needs to be approached. 
+<br>The point it makes is <u><em>first define precise correctness conditions before proposing a solution</em></u>.</p>
+<p>Defining the correctness condition independent of solution helps in formulating the solution in precise terms &amp; subsequent verification of the solution in terms of 
+the correctness conditions(<em>sometimes solution is defined in terms of the correctness condition itself</em>).</p>
+<p>So we will discuss this paper as problem, correctness, solution &amp; analysis in terms of correctness conditions(instead of proof).</p>
+<h3 id="problem-statement">Problem Statement<a class="headerlink" href="#problem-statement" title="Permanent link">&para;</a></h3>
+<p>Distributed systems consists of hosts connected through network. The algorithm needs to work considering it's environment.</p>
+<ul>
+<li><strong><em>Concurrency:</em></strong><ul>
+<li><em>Concurrent Requests</em>: The RSM can receive concurrent requests from multiple clients.  </li>
+<li><em>Algorithm Concurrency:</em> There can be concurrent operations internal to the algorithm execution itself.</li>
+</ul>
+</li>
+<li><strong><em>Failure</em></strong>: <ul>
+<li>The hosts can crash &amp; restart at any time. </li>
+<li>The hosts can stall &amp; stop processing for arbitrary lengths of time. </li>
+<li>Hosts either crash and don't participate or are totally well behaved. 
+  Partial correctness(<em>like can send messages but are unable to receive messages</em>) and malicious behavior is ruled out.</li>
+</ul>
+</li>
+<li><strong><em>Network behavior</em></strong>: <ul>
+<li>The messages sent over the network can get arbitrarily delayed, may be lost, get duplicated or be delivered out-of-order.</li>
+<li>The integrity of the messages sent over the network is ensured. </li>
+<li>If messages are sent repeatedly, then it will be delivered eventually i.e network is reliable.</li>
+</ul>
+</li>
+<li><strong><em>No Disk</em></strong>: VSR doesn't require persistent storage. However failure independence of hosts is assumed. </li>
+</ul>
+<p><todo>
+Another limitation with distributed systems is that certain <strong><em>state of the system is global</em></strong>(like current leader) while each of the individual hosts
+have only <strong><em>local knowledge</em></strong>. </p>
+<h3 id="correctness-condition">Correctness Condition<a class="headerlink" href="#correctness-condition" title="Permanent link">&para;</a></h3>
+<p>The execution of any algorithm can be visualized as a sequence of state transitions<sup>[2]</sup>, with each state assigning some
+value to the algorithm's variables. Any algorithm's correctness can be characterized using two distinct set of correctness 
+conditions<sup>[3]</sup> viz. </p>
+<ul>
+<li><strong><em>Safety</em></strong>: Every step(state transition) the algorithms takes is correct, an incorrect step can't be remedied &amp;</li>
+<li><strong><em>Liveness</em></strong>: It should be always be possible for the algorithm to take another step. </li>
+</ul>
+<p>If we consider mutex as an example then no two processes should be able to enter the critical section simultaneously(<strong><em>safetey</em></strong>)
+&amp; it should be possible for every process to eventually enter the critical section(<strong><em>liveness</em></strong>).</p>
+<p>The safety condition for the RSM is that the replicated log needs to satisfy two conditions<sup>[4]</sup>: </p>
+<ul>
+<li><strong><em>Agreement</em></strong>: All the logs across hosts should contain the same set of commands/operations.</li>
+<li><strong><em>Order</em></strong>: The order of the commands present in the logs need to be same.</li>
+</ul>
+<p>Liveness condition<todo>
+If a set of deterministic state machines begin with the same initial state &amp; the above two conditions are met, then 
+applying the commands in the log will result in identical state machines. Ensuring these two conditions are met with the problems 
+listed in the previous section is difficult.      </p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong><em>The logs may diverge under certain situations but they need to match exactly 
+  w.r.t the commands that get applied to the state machine.</em></strong></p>
+</div>
+<h3 id="solution">Solution<a class="headerlink" href="#solution" title="Permanent link">&para;</a></h3>
+<p><strong><em>Primary:</em></strong>
+  Multiple clients can make requests to replicated state machine simultaneously. VSR chooses one replica as primary &amp; the rest 
+  act as backups. All clients send requests to the primary replica. Primary assigns a monotonically increasing number(called <strong><em>operation number</em></strong>) 
+  to the request received &amp; replicates the requests to other backup replicas.    </p>
+<p><strong><em>Primary failure:</em></strong>
+  If the primary fails then all the replicas together select another replica as primary &amp; go through a reconciliation process called <strong><em>view-change</em></strong>. 
+  The logs across the replicas are consolidated &amp; replicas are initialized with a new log to begin the next <strong><em>view</em></strong> ensuring the agreement &amp; order properties 
+  w.r.t committed entries. </p>
+<p>Replicas are numbered &amp; get chosen as primary in round robin fashion as the system goes through a sequence of view changes.
+  For example in three replica system, replica 1 is primary for views {1,4,7}, replica 2 is primary for views {2,5,8} etc. </p>
+<p><strong><em>Backup failure:</em></strong>
+  If backup fails then it goes through a <strong><em>recovery</em></strong> process to restore it's state to latest system state before it can rejoin
+  the rest of the replicas &amp; participate in various operations.</p>
+<p><strong><em>Reconfiguration:</em></strong>
+  The set of replicas need to be altered. Reconfiguration is required to replace a fault host or increase/decrease no. of replicas 
+  in the system. Replicas store an <strong><em>epoch number</em></strong> which is incremented whenever the system goes through reconfiguration.</p>
+<p><strong><em>Network behavior:</em></strong></p>
+<ul>
+<li><em>Out-of-order delivery</em> &amp; <em>duplicates</em>: 
+      Primary assigns monotonically increasing integer numbers to the requests received from clients.    </li>
+<li><em>loss</em>: Primary retries mitigates message loss to some extent. In practical implementations retries are limited, 
+            VSR provides another mechanism(<em>GET-STATE</em> operation) to deal with message loss.  </li>
+<li><em>delay</em>: A replica can wait for a finite time(timeout) to receive a response from another replica. 
+             However timeouts are only an approximate method, they are non-deterministic. We will see how this can
+             cause liveness issue(<em>though it has limited impact</em>) during primary election.                 </li>
+</ul>
+<p><strong><em>Algorithm concurrency:</em></strong>
+  For instance backup might try to recover while view-change is in progress. Replicas enter into certain state
+  to deal with such concurrent operations to ensure safety. This also restricts the state space of the algorithm's
+  execution which helps in simplification of the algorithm.
+  <todo trade-off between availability & algorithm's simplicity> </p>
+<p><strong><em>Quorum:</em></strong></p>
+<p><em>Quorum intersection property</em>: 
+  If we consider a set of <code>2F + 1</code> elements, then at least one element is common between any two subsets consisting of <code>F + 1</code> elements(<strong><em>majority</em></strong>/<strong><em>quorum</em></strong>).
+  VSR uses this property to achieve <strong><em>reliability</em></strong>:. </p>
+<ul>
+<li>Primary replicates a request to at least a quorum of replicas before it commits the request to state machine,
+    <strong><em>commit number</em></strong> is incremented after a request is applied to state machine. </li>
+<li>When a primary fails &amp; new primary is elected, logs are gathered from a quorum of replicas for reconciliation of the
+    system state before next <strong><em>view</em></strong> is started. </li>
+<li>Similarly, when a backup fails it gathers state from a quorum of replicas to reinitialize it's state.   </li>
+</ul>
+<p>The above three conditions ensure that there is continuity w.r.t the system state i.e any committed entry is known
+  to at least one replica in the quorum. Since only a quorum of replicas are necessary for correct functioning 
+  of the system, up to <code>F</code> failures can be sustained. 
+  Thus the system achieves both <strong><em>reliability</em></strong> &amp; <strong><em>fault tolerance</em></strong>.  </p>
+<p><todo normal, view-change, recovery terminology></p>
+<details>
+<summary>Summary: Problem-Solution</summary>
+<table>
+<thead>
+<tr>
+<th><strong>Problem</strong></th>
+<th><strong>Solution</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>Concurrent client requests</em></td>
+<td><em>A single primary handles all client requests</em>.</td>
+</tr>
+<tr>
+<td><em>Algorithm Concurrency (e.g: recovery during reconfiguration)</em></td>
+<td><em>Algorithm states restrict certain concurrent operations which simplifies design &amp; helps in ensuring safety</em>.</td>
+</tr>
+<tr>
+<td><em>Primary Failure</em></td>
+<td><em>New primary election leveraging quorum replication, system goes through reconciliation process</em>.</td>
+</tr>
+<tr>
+<td><em>Backup Failure</em></td>
+<td><em>Recovery mechanism leveraging quorum replication,  failure independence assumed</em>.</td>
+</tr>
+<tr>
+<td><em>Message loss, out-of-delivery, duplication, delay</em></td>
+<td><em>Algorithm needs additional mechanism to deal with these issues</em>. In particular, delay needs timeout.</td>
+</tr>
+</tbody>
+</table>
+</details>
+<h3 id="abstract-representation">Abstract Representation<a class="headerlink" href="#abstract-representation" title="Permanent link">&para;</a></h3>
+<p>An abstract representation of a host in VSR system is as shown below: 
+<div class="language-text highlight"><span class="filename">Replica</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>  - epoch-no:  epoch number abstracts system configuration, if replicas present in system change 
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>               then system goes through a epoch change.    
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  - view-no:   view number abstracts failure(primary replica changes), if a primary fails then 
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>               the system goes through a view change. 
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  - op-no:     it&#39;s an index for a slot in the log, each slot contains one request or command. 
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  - commit-no: identifies the op-no up to which the state machine has consumed the input requests 
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>               or commands.                 
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  Replicated log: 
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  |&lt;=======================================time=====================================&gt;|    
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  |&lt;~~~~~~~~~~~~~e1~~~~~~~~~~~&gt;|&lt;~~~~~~~~~~~~~~~~~~~~~~~e2~~~~~~~~~~~~~~~~~~~~~~~~~~&gt;|
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>  |&lt;----v1----&gt;|&lt;------v2-----&gt;|&lt;---v3--&gt;|&lt;----v4----&gt;|&lt;-------------v5-------------&gt;|
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>  |&lt;a&gt;&lt;b&gt;&lt;c&gt;&lt;d&gt;|&lt;e&gt;&lt;f&gt;&lt;g&gt;&lt;h&gt;&lt;i&gt;|&lt;j&gt;&lt;k&gt;&lt;l&gt;|&lt;m&gt;&lt;n&gt;&lt;o&gt;&lt;p&gt;|&lt;q&gt;&lt;r&gt;&lt;s&gt;&lt;t&gt;&lt;u&gt;&lt;v&gt;&lt;w&gt;&lt;x&gt;&lt;y&gt;&lt;z&gt;|
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>  en: epoch-no &lt;todo subscript&gt;
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>  vn: view-no
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>  &lt;.&gt;: operations or command
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>  - replica-no:     each replica is numbered, view number is mapped to replica-no &amp; thus primary is determined. 
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>  - configuration:  the set of replicas in the system.
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>  - status:         each replica maintains a status which corresponds to the sub-protocol that it is executing.
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>  Note: Epoch &amp; view numbers can be discontinuous but operation number is continuous, always.
+</span></code></pre></div></p>
+<p>Messages exchanged among replicas are represented as <code>&lt;MESSAGE-NAME comma separated parameters&gt;</code> e.g <code>&lt;PREPARE v,m,n,k&gt;</code>.
+The attributes carried in various messages are shown below, view &amp; epoch parameter reflect the system state. </p>
+<div class="language-text highlight"><span class="filename">Message Attributes</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>  v: view-number  k: commit-number      v: last normal view   i,j: replica number   e: epoch-number
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  l: log          n: operation-number   m: operation          x: context dependent
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                  (log index)           (client message)
+</span></code></pre></div>
+<h3 id="analysis">Analysis<a class="headerlink" href="#analysis" title="Permanent link">&para;</a></h3>
+<h4 id="normal">Normal<a class="headerlink" href="#normal" title="Permanent link">&para;</a></h4>
+<div class="admonition note annotate">
+<p class="admonition-title">Correctness Condition, Normal Sub-Protocol (1)</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>  Safety:    
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    * Primary should ensure the agreement &amp; order condition i.e client requests 
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>      should be replicated consistently(no divergence) across all the replicas.       
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  Liveness:            
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    * Eventually the client requests should be replicated across all the replicas.
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    * Eventually all the requests should be applied to the state machines on both primary &amp; backup replicas.
+</span></code></pre></div>
+</div>
+<ol>
+<li>
+<div class="admonition note">
+<p class="admonition-title"><em>Normal Sub-Protocol</em></p>
+<ol>
+<li>Backups process request if their status is <code>normal</code> &amp; view matches with that in the request message. <ul>
+<li>If view-no is lesser then message is ignored </li>
+<li>if view-no is greater then replica moves to that view by doing a <code>&lt;GET-STATE&gt;</code> operation(discussed later).</li>
+</ul>
+</li>
+<li>Primary receives request from client &amp; adds it to it's log by incrementing 
+     it's <strong><em>operation number</em></strong>.  </li>
+<li>Primary sends <code>&lt;PREPARE v,m,n,k&gt;</code> message to add an entry to the backup replica. </li>
+<li>Backup accepts <code>PREPARE</code> request only if <strong><em>operation number</em></strong> in the request is one more 
+     compared to the top most entry's index in it's log.<ul>
+<li>Backup sends <code>&lt;PREPAREOK v,n,i&gt;</code> if it accepts the request from primary.</li>
+<li>If backup sees it is missing entries then it sends <code>&lt;GET-STATE v,n,i&gt;</code>. 
+     to one of the replicas to get missing entries &amp; then sends <code>&lt;PREPAREOK&gt;</code> reply.</li>
+</ul>
+</li>
+<li>Primary commits requests if it receives a quorum of <code>&lt;PREPAREOK&gt;</code> replies, 
+     primary communicates the commit index either through next <code>&lt;PREPARE&gt;</code> message or by 
+     sending <code>&lt;COMMIT&gt;</code> messages, periodically. <code>&lt;COMMIT&gt;</code> also acts a heart beat mechanism.<ul>
+<li>If backup identifies missing entries when it receives <code>&lt;COMMIT&gt;</code> message, 
+   backup will do a <code>&lt;GETSTATE&gt;</code> operation to fetch the missing entries.</li>
+</ul>
+</li>
+</ol>
+</div>
+</li>
+</ol>
+<h4 id="view-change">View Change<a class="headerlink" href="#view-change" title="Permanent link">&para;</a></h4>
+<div class="admonition note annotate">
+<p class="admonition-title">Correctness Condition, View-Change Sub-Protocol (1)</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>  Safety:    
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    * During view-change all the committed entries need to be preserved maintaining agreement &amp; order condition.       
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  Liveness:            
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    * View-change should complete &amp; normal processing should resume, should not be stuck in SVC/DVC messaging.
+</span></code></pre></div>
+</div>
+<ol>
+<li>
+<div class="admonition note">
+<p class="admonition-title"><em>View-Change Sub-Protocol</em></p>
+<div class="language-text highlight"><pre><span></span><code>1. If a backup doesn&#39;t receive timely PREPARE/COMMIT messages then it increments it&#39;s
+   view-number, changes it&#39;s state to `view-change` &amp; triggers view-change 
+   by broadcasting `&lt;START-VIEW-CHANGE v,i&gt;` message.
+*  When a quorum(including self) of SVC messages are received by a backup, it sends 
+   `&lt;DO-VIEW-CHANGE v,l,v&#39;,n,k,i&gt;` message to the new primary(determined by 
+   the incremented view-number), l corresponds to it&#39;s log in it&#39;s last normal view v&#39;.  
+*  When the new primary receives are quorum(including self) of DVC messages it reconciles 
+   the logs received in DVC messages. A new log is chosen based on: 
+    * largest v&#39;, if multiple logs have same v&#39; then one with largest n is chosen.
+    * k is chosen to be largest of such values received in the DVC messages.        
+* New primary sends `&lt;START-VIEW v,l,n,k&gt;` message to all replicas with log chosen in 
+  the previous step and starts normal operation.
+* If replicas don&#39;t receive `&lt;START-VIEW&gt;` messages then backups trigger another round
+  of SVC/DVC messaging by advancing to the next view.
+</code></pre></div>
+<p>Note: </p>
+<ol>
+<li>The new primary might or might not be part of SVC messaging.</li>
+<li>Quorum reply for <code>&lt;START-VIEW&gt;</code> request is not necessary for new primary to begin normal processing as safety is
+   preserved by replication to quorum before commit can happen.</li>
+</ol>
+</div>
+</li>
+</ol>
+<div class="admonition warning">
+<p class="admonition-title">SVC Messaging</p>
+<p><strong><em>SVC messaging is crucial for view-change as it ensures log stability before entering the DVC phase which reconciles the logs.</em></strong> 
+<strong><em><br>A primary might have slowed down(not crashed) &amp; timeout occurred.</em></strong>
+<strong><em><br>SVC phase ensures that quorum of replicas agree to stop processing the requests from the primary before entering into DVC phase.</em></strong></p>
+</div>
+<h5 id="network-partitions"><strong>Network Partitions</strong><a class="headerlink" href="#network-partitions" title="Permanent link">&para;</a></h5>
+<p>When a network partition occurs <code>PREPARE</code>/<code>COMMIT</code> messages will be lost which can trigger view changes. 
+There are two cases depending on which side of partition the primary is present. These scenarios need to be 
+analyzed as the paper discusses about primary failure only. </p>
+<details class="note">
+<summary>Network split with majority containing the primary</summary>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">View<sub>majority</sub> &lt; View<sub>minority</sub></label><label for="__tabbed_1_2">View<sub>majority</sub> = View<sub>minority</sub></label><label for="__tabbed_1_3">View<sub>majority</sub> &gt; View<sub>minority</sub></label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p><table>
+<thead>
+  <tr>
+    <th>time</th>
+    <th>majority</th>
+    <th>minority</th>
+    <th>context</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>t1</td>
+    <td>V<sub>majority</sub> = V</td>
+    <td>V<sub>minority</sub> = V</td>
+    <td>Network partition occurs</td>
+  </tr>
+  <tr>
+    <td>t2</td>
+    <td>V<sub>majority</sub> = V<br>Status = normal</td>
+    <td>V<sub>minority</sub> = V + 1<br>Status = view-change<br>Phase = SVC</td>
+    <td>* Minority doesn't receive heart   beat messages &amp; moves to view-change. <br>* It's stuck in SVC as there is no majority</td>
+  </tr>
+  <tr>
+    <td>t3</td>
+    <td colspan="2">* Both groups join &amp; view-change continues. <br>* The group as whole moves to view v+1. <br>* However this view-change is <strong>unnecessary</strong> as  majority was functioning normally.</td>
+    <td>Network partition heals</td>
+  </tr>
+</tbody>
+</table></p>
+</div>
+<div class="tabbed-block">
+<p><table style="undefined;table-layout: fixed; width: 935px">
+<colgroup>
+<col style="width: 40.2px">
+<col style="width: 193.2px">
+<col style="width: 343.2px">
+<col style="width: 358.2px">
+</colgroup>
+<thead>
+  <tr>
+    <th>time</th>
+    <th>majority</th>
+    <th>minority</th>
+    <th>context</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>t1</td>
+    <td>V<sub>majority</sub> = V</td>
+    <td>V<sub>minority</sub> = V<br></td>
+    <td>Network partition occurs</td>
+  </tr>
+  <tr>
+    <td>t2</td>
+    <td>V<sub>majority</sub> = V<br><br>Status = normal</td>
+    <td>V<sub>minority</sub> = V + 1<br>Status = view-change<br>Phase = SVC</td>
+    <td>* Minority doesn't receive heart   beat messages &amp; moves to view-change. <br>* It's stuck in SVC as there is no majority</td>
+  </tr>
+  <tr>
+    <td>t3</td>
+    <td>V<sub>majority</sub> = V + 1<br>Status = normal</td>
+    <td>V<sub>minority</sub> = V + 1<br>Status = view-change<br>Phase = SVC</td>
+    <td>Primary crashes &amp; majority   advances to it's view.</td>
+  </tr>
+  <tr>
+    <td>t4</td>
+    <td colspan="2">* Majority receives SVC messages which it needs to ignore since it is already in <br>same view with status as normal which can be considered to be further ahead on the timeline.   <br>* Minority will receive PREPARE/COMMIT messages from primary. <br>Minority can move to normal state by transferring state through <br>GET-STATE operation. <br><strong><em>Note that primary could have added some entries in view V before proceeding to view V+1.</em></strong></td>
+    <td>Network partition heals.</td>
+  </tr>
+</tbody>
+</table></p>
+</div>
+<div class="tabbed-block">
+<p><table style="undefined;table-layout: fixed; width: 906px">
+  <colgroup>
+  <col style="width: 40.2px">
+  <col style="width: 159.2px">
+  <col style="width: 342.2px">
+  <col style="width: 364.2px">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>time</th>
+      <th>majority</th>
+      <th>minority</th>
+      <th>context</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>t1</td>
+      <td>V<sub>majority</sub> = V</td>
+      <td>V<sub>minority</sub> = V</td>
+      <td>Network partition occurs</td>
+    </tr>
+    <tr>
+      <td>t2</td>
+      <td>V<sub>majority</sub> = V<br>Status = normal</td>
+      <td>V<sub>minority</sub> = V + 1<br>Status = view-change<br>Phase = SVC</td>
+      <td>* Minority doesn't receive heart   beat messages &amp; moves to view-change. <br>* It's stuck in SVC as there is no majority</td>
+    </tr>
+    <tr>
+      <td>t3</td>
+      <td>V<sub>majority</sub> = V + 2</td>
+      <td>V<sub>minority</sub> = V + 1</td>
+      <td>Majority goes through multiple view changes</td>
+    </tr>
+    <tr>
+      <td>t4</td>
+      <td colspan="2">* SVC messages from minority group will be ignored since majority has higher  view-no.<br>* Minority receives PREPARE/COMMIT from the primary. 
+      <br><strong><em>Minority can move to normal state by transferring state through GET-STATE operation</em></strong>.     </td>
+      <td>Network Partition heals.</td>
+    </tr>
+  </tbody>
+  </table></p>
+</div>
+</div>
+</div>
+</details>
+<details class="note">
+<summary>Network split with minority containing the primary</summary>
+<p><strong>Note:</strong> <em>View<sub>majority</sub> &lt; View<sub>minority</sub></em> doesn't seem to be possible  </p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">View<sub>majority</sub> &gt; View<sub>minority</sub></label><label for="__tabbed_2_2">View<sub>majority</sub> = View<sub>minority</sub></label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p><table>
+<thead>
+  <tr>
+    <th>time</th>
+    <th>majority</th>
+    <th>minority</th>
+    <th>context</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>t1</td>
+    <td>V<sub>majority</sub> = V</td>
+    <td>V<sub>minority</sub> = V</td>
+    <td>Network partition occurs</td>
+  </tr>
+  <tr>
+    <td>t2</td>
+    <td>V<sub>majority</sub> = V + 1<br>Status = normal</td>
+    <td>V<sub>minority</sub> = V<br>Status = normal<br>     </td>
+    <td>Minority continues receiving heart beat messages, <br>hence view number doesn't advance</td>
+  </tr>
+  <tr>
+    <td>t3</td>
+    <td colspan="2">* Minority group receives PREPARE/COMMIT messages<br>* As minority notices higher view number it does GET-STATE operation and thus advances it's view.</td>
+    <td>Network partition heals</td>
+  </tr>
+</tbody>
+</table></p>
+</div>
+<div class="tabbed-block">
+<p><table>
+<thead>
+  <tr>
+    <th>time</th>
+    <th>majority<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+    <th>minority</th>
+    <th>context</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>t1</td>
+    <td>V<sub>majority</sub> = V</td>
+    <td>V<sub>minority</sub> = V</td>
+    <td>Network partition occurs</td>
+  </tr>
+  <tr>
+    <td>t2</td>
+    <td>V<sub>majority</sub> = V + 1<br>Status = normal</td>
+    <td>V<sub>minority</sub> = V<br>Status = normal<br>     </td>
+    <td>Minority continues receiving heart beat <br>messages, hence view number doesn't advance</td>
+  </tr>
+  <tr>
+    <td>t3</td>
+    <td>V<sub>majority</sub> = V + 1<br>Status = normal</td>
+    <td>V<sub>minority</sub> = V + 1<br>Status = view-change<br>Phase = SVC</td>
+    <td>Primary crashes</td>
+  </tr>
+  <tr>
+    <td>t4</td>
+    <td colspan="2">* Majority receives SVC messages which it needs to ignore since it is already in same view with status as normal which can be considered to be further ahead on the timeline.   <br>* Minority will receive PREPARE/COMMIT messages from primary. <br>  Minority can <strong><em>move to normal</em></strong> state by transferring state through GET-STATE operation. <br><br><strong><em>Even though view is same state transfer should be done from last commit index since minority</em></strong> <br><strong><em>has gone through view-change &amp;</em></strong> 
+     <strong><em>in the process one or more operation numbers could have been reassigned to different client requests.</em></strong></td>
+    <td>Network partition heals</td>
+  </tr>
+</tbody>
+</table></p>
+</div>
+</div>
+</div>
+</details>
+<details class="success">
+<summary>Results</summary>
+<p>GET-STATE is discussed only in the context when the replicas are in normal state.</p>
+<ul>
+<li>During network partition replicas can be in view-change state and receive PREPARE/COMMIT
+messages. Replicas need to move to normal state through <code>GET-STATE</code> operation.</li>
+<li>Even if view matches when backup receives PREPARE/COMMIT while it's in view-change, 
+  it needs to transfer entries from it's last commit point(unlike as done during normal operation).  </li>
+<li>Sometimes unnecessary view-change is triggered.</li>
+</ul>
+<p>Note that SVC messaging should continue <strong><em>indefinitely</em></strong>(till network partition heals) for 
+the replicas in the backup to rejoin.</p>
+</details>
+<h5 id="data-loss-with-get-state">Data Loss with GET-STATE<a class="headerlink" href="#data-loss-with-get-state" title="Permanent link">&para;</a></h5>
+<p>Note that for <code>GET-STATE</code> in view-change scenario, the paper says backup replica clears up entries beyond it's commit index
+before sending a <code>&lt;GET-STATE&gt;</code> request. This should ring an alarm as an entry which is already committed might now be
+present on less than a quorum of replicas, violating the safety property.</p>
+<p>Imagine the following scenario:
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>A system consisting of three replicas viz. r1, r2, r3.
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>* r1 is the primary &amp; view is 1, r1 &amp; r2 participated in normal operation with
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  some entries getting committed by r1. 
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>* r1 goes offline(doesn&#39;t crash), view change for views 2 &amp; 3 are unsuccessful 
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  with r2 &amp; r3 being participants.
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>* r1 comes back &amp; becomes primary for view 4 with r1 &amp; r3 being participants,
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>  however r3 din&#39;t receive start-view message, so it&#39;s log is same as it was in view 1.
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>* r1 sends prepare message to r2 with view as 4 &amp; crashes, r2 truncates it&#39;s log before 
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>  sending &lt;get-state&gt; request.     
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>Even though two replicas are available r2 &amp; r3, committed entry is lost.
+</span></code></pre></div></p>
+<h5 id="decreasing-commit-index">Decreasing Commit Index<a class="headerlink" href="#decreasing-commit-index" title="Permanent link">&para;</a></h5>
+<p>It is possible that primary has committed certain entries but the same has not been conveyed to the backup replicas through 
+PREPARE/COMMIT messaging i.e primary's commit-index is ahead of backups. 
+If a view-change occurs at this stage &amp; ships the log to previous primary(din't crash but slowed down) then it's commit-index can decrease. 
+The scenario is illustrated below. If primary crashes &amp; recovers then same behavior is observed. </p>
+<details class="note">
+<summary>Commit index decreases</summary>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>                          &lt;n=1,k=0&gt;           &lt;n=1,k=0&gt;
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>1--&lt;a&gt;--(a)---&lt;a&gt;--------(a)--#--!!!!!!!!!!--sv----             &lt;a&gt;: request
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    \   /      \         /    &lt;n=1,k=1&gt;      /                  (a): response
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    \ /        \       /                   /                   x: entry added
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>2-----x----------\-----/-------------------sv------             #: commit
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>      a           \   /                     \                   !!!: primary pauses, view-change  
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>                  \ /                       \                  sv: start-view message  
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>3-------------------x------------------------sv----
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>                    a                        &lt;n=1,k=0&gt;
+</span></code></pre></div>
+</details>
+<p>As a solution the state machine needs to dedupe based on the operation number(which needs to be persisted
+as entries get applied to state machine since VSR doesn't use disk for any of it's operation).</p>
+<h5 id="flp-vsr">FLP &amp; VSR<a class="headerlink" href="#flp-vsr" title="Permanent link">&para;</a></h5>
+<p>FLP states that consensus is not possible in an async system even with a single faulty process under certain circumstances i.e consensus is 
+not possible sometimes. If a primary chosen through SVC-DVC messaging becomes faulty(crash or slows down) then the remaining replicas
+are in dilemma:</p>
+<ul>
+<li>is new primary slow, should they wait longer ?</li>
+<li>has the chosen primary crashed &amp; should they start another round of SVC-DVC messaging incrementing the view number ?   </li>
+</ul>
+<p>In my understanding, this is the manifestation of FLP in the VSR algorithm. 
+It seems like FLP has much lesser impact compared to RAFT or Paxos as replicas don't compete(to be next primary) 
+rather co-ordinate in selecting the next primary. The impact is minimal as the chosen primary has to be down.</p>
+<h4 id="recovery">Recovery<a class="headerlink" href="#recovery" title="Permanent link">&para;</a></h4>
+<div class="admonition note annotate">
+<p class="admonition-title">Correctness Condition, Recovery Sub-Protocol (1)</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>  Safety:    
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    * Backup should recover into the latest view of the system.       
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>  Liveness:            
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    * Recovery should complete in timely manner without getting stuck.
+</span></code></pre></div>
+</div>
+<ol>
+<li>
+<div class="admonition note">
+<p class="admonition-title"><em>Recovery Sub-Protocol</em></p>
+<div class="language-text highlight"><pre><span></span><code>1. VSR doesn&#39;t use disk, failure independence is assumed. 
+* Gather state from a quorum of replicas including primary
+  of the view to which the backup is recovering.
+*
+</code></pre></div>
+</div>
+</li>
+</ol>
+<h5 id="primary-failure"><strong>Primary Failure</strong>:<a class="headerlink" href="#primary-failure" title="Permanent link">&para;</a></h5>
+<p>If a primary fails then it recovers into the next view after a new primary is elected. 
+Since recovery process requires primary among the quorum of replicas using which recovery is executed.</p>
+<h5 id="recovery-during-view-change"><strong>Recovery during view-change</strong>:<a class="headerlink" href="#recovery-during-view-change" title="Permanent link">&para;</a></h5>
+<p>If a backup attempts recovery during an ongoing view-change then there are two possibilities:</p>
+<ul>
+<li>Recover into view, V, prior to view-change:
+    If backup is able to contact </li>
+<li>Recovers into view, V+1, after view-change:<ul>
+<li>In such cases the backup has to restart recovery process.</li>
+</ul>
+</li>
+</ul>
+<h3 id="practical-implementation">Practical Implementation<a class="headerlink" href="#practical-implementation" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>System state = App State + Log State</code></li>
+<li><code>App state = Checkpoints, Snapshot, Merkle Tree</code>
+One may check <a href="">Paxos Made Live</a> for challenges encountered with real world implementation of RSM.</li>
+</ul>
+<h3 id="conclusion">Conclusion<a class="headerlink" href="#conclusion" title="Permanent link">&para;</a></h3>
+<div class="admonition note">
+<p class="admonition-title">Inference</p>
+<ul>
+<li>On paper analysis of the algorithm is <strong><em>extremely difficult</em></strong> due to <u><strong><em>concurrency, out-of-order message delivery</em></strong> 
+  <strong><em>&amp; failure</em></strong></u> occurring at any moment. 
+  Formal verification(like TLA+ which explores the algorithm's state space) becomes imperative.  </li>
+<li>Following cases w.r.t view-change operation were discovered:<ul>
+<li><code>View-Change</code> to <code>Normal</code> state transition with replicas in <code>view-change</code> state having same or lesser view.
+  <br>Even in the case of same view, state transfer needs to be done from last commit-index.</li>
+<li>Data loss w.r.t <code>GET-STATE</code> operation.</li>
+<li>Commit index going backwards. </li>
+</ul>
+</li>
+<li>Following cases w.r.t recovery operation were discovered:<ul>
+<li>VSR makes broad sketches w.r.t recovery operation, modeling can be helpful here while filling the gaps w.r.t details.</li>
+<li>The recovery operation might have to be restarted if it gets triggered during an ongoing view-change operation.        </li>
+</ul>
+</li>
+<li>Practical implementation need to consider application state transfer along with log entries transfer for 
+  view-change &amp; recovery operations.  </li>
+<li>VSR pushes all disk operation to the background in order to achieve performance. This can be limited
+  to data replication alone &amp; explore storing certain other information on disk if it helps in achieving
+  algorithm simplicity.</li>
+<li>VSR uses algorithm states so as to disable certain operations while others are in progress. In certain cases
+  this a trade-off between availability &amp; simplicity of the algorithm(vertical Paxos abstract reads as 
+  "reconfiguration in the middle of consensus").</li>
+</ul>
+</div>
+<h3 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h3>
+<p><todo add-references>
+1. <a href="https://lamport.azurewebsites.net/pubs/state-the-problem.pdf">State the Problem Before Describing the Solution</a>
+2. <a href="https://lamport.azurewebsites.net/tla/safety-liveness.pdf">Safety, Liveness, and Fairness</a>
+3. <a href="https://www.cs.cornell.edu/fbs/publications/DefLiveness.pdf">Defining Liveness</a></p>
+<h1 id="-title-state-transition-between-normal-or-view-change-states-for-replicas-flowchart-lr-nnormal-svcsvc-dvcdvc-n-timeoutsvc-svc-move-to-next-viewbrdvc-not-received-timeoutsvc-svc-quorum-of-svcsdvc-svc-preparecommitbrwith-higher-or-same-viewn-dvc-preparecommitbrwith-higher-or-same-viewn-dvc-start-viewn"><pre class="mermaid"><code>---
+title: State transition between normal or view-change states for replicas
+---
+flowchart LR
+  N(Normal) 
+  SVC(SVC)
+  DVC(DVC)
+
+  N   --&gt;|Timeout|SVC
+  SVC --&gt;|"move to next view&lt;br&gt;(DVC not received timeout)"|SVC 
+  SVC --&gt;|quorum of SVCs|DVC
+
+  SVC --&gt;|"prepare/commit&lt;br&gt;(with higher or same view)"|N
+  DVC --&gt;|"prepare/commit&lt;br&gt;(with higher or same view)"|N
+  DVC --&gt;|"START VIEW"|N    </code></pre><a class="headerlink" href="#-title-state-transition-between-normal-or-view-change-states-for-replicas-flowchart-lr-nnormal-svcsvc-dvcdvc-n-timeoutsvc-svc-move-to-next-viewbrdvc-not-received-timeoutsvc-svc-quorum-of-svcsdvc-svc-preparecommitbrwith-higher-or-same-viewn-dvc-preparecommitbrwith-higher-or-same-viewn-dvc-start-viewn" title="Permanent link">&para;</a></h1>
+<p>```
+Replicated State Machine -&gt; Replicated log -&gt; Basis for building fault tolerant System </p>
+<p>The operations present in replicated log when applied to state machines across replicas result in identical machines, hence it is basic primitive for realizing various fault tolerant 
+distributed systems like database, storage etc.</p>
+<p>VSR is replication algorithm which can be used to realize a replicated state machine(RSM) which consists of a distributed/replicated log consisting of same set of operations(agreement) &amp; in the same sequence(order)
+<todo add-reference>. </p>
+<p>Unlike Paxos VSR is structured as replication algorithm &amp; thus more aligned towards realizing a RSM. 
+However, VSR uses a Paxos like consensus algorithm for part of it's operation(primary election) - atomic broadcast(reliable replication) &amp; consensus are equivalent problems<todo add-reference>.</p>
+<p>Replication should satisfy two conditions<todo add-reference>:
+  * Agreement: All logs should contain same entries.
+  * Order: The entries across different logs should follow same order.  </p>
+<p>These fairly simple conditions are difficult to maintain in distributed system.</p>
+<p>VSR is replication algorithm which uses Paxos like consensus algorithm for part of it's operation - reliable broadcast &amp; consensus are equivalent problems<add-ref> </p>
+<p>No Disk - either for consensus or for storing replicated data, assuming independent failure.<br />
+  Byzantine ??</p>
+<p>Client &lt;-&gt; VSR &lt;-&gt; SM
+````
+==============================================================================================</p>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+  
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.tabs", "toc.follow", "content.action.edit", "navigation.top"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.1e8ae164.min.js"></script>
+      
+    
+  </body>
+</html>
