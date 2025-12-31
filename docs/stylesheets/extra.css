@@ -13,3 +13,22 @@
     line-height: 0.5;
 }
 
+:root {
+    --md-tooltip-width: 800px;
+}
+
+.md-typeset ul li,
+.md-typeset ol li {
+  margin-top: 0em;
+  margin-bottom: 0em;
+}
+
+.md-typeset p + ul {
+    margin-top: -8px;
+    margin-bottom: 0em;
+}
+
+.md-typeset .admonition.narrow {
+  max-width: 880px;
+  margin-inline: auto;
+}

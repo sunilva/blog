@@ -32,7 +32,7 @@ nav:
   - Home: index.md
   #- Reading List: reading.md
   #- Bookmarks: bookmarks.md
-  #- About: about.md
+  - About: about.md
   #- Blog: blog/index.md
 
 plugins: 
